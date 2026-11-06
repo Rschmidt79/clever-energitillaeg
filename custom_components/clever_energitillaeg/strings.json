@@ -1,0 +1,58 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Clever energy surcharge",
+        "description": "Preliminary rate from Energinet day-ahead prices (DK1/DK2 50/50, incl. VAT). Optionally pick an energy sensor that resets every month (e.g. a utility meter with cycle: monthly) to get the preliminary surcharge in DKK.",
+        "data": {
+          "energy_entity": "Monthly energy sensor (optional)",
+          "threshold": "Threshold",
+          "vat_percent": "VAT"
+        },
+        "data_description": {
+          "energy_entity": "Must reset on the 1st of the month and provide last_reset (utility meter).",
+          "threshold": "Clever's threshold incl. VAT; the surcharge is the part of the average above it.",
+          "vat_percent": "Added to the spot price before comparing."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Already configured.",
+      "single_instance_allowed": "Already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Clever energy surcharge",
+        "data": {
+          "energy_entity": "Monthly energy sensor (optional)",
+          "threshold": "Threshold",
+          "vat_percent": "VAT"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "rate": {
+        "name": "Preliminary rate"
+      },
+      "national_average": {
+        "name": "National average"
+      },
+      "average_dk1": {
+        "name": "Average DK1"
+      },
+      "average_dk2": {
+        "name": "Average DK2"
+      },
+      "last_fetch": {
+        "name": "Last fetch"
+      },
+      "surcharge": {
+        "name": "Preliminary surcharge"
+      }
+    }
+  }
+}

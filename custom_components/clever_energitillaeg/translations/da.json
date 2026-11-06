@@ -1,0 +1,58 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Clever energitillæg",
+        "description": "Foreløbig sats ud fra Energinets day-ahead-priser (DK1/DK2 50/50, inkl. moms). Vælg evt. en energisensor, der nulstilles hver måned (fx en utility meter med cycle: monthly), for at få det foreløbige tillæg i kroner.",
+        "data": {
+          "energy_entity": "Månedlig energisensor (valgfri)",
+          "threshold": "Grundsats",
+          "vat_percent": "Moms"
+        },
+        "data_description": {
+          "energy_entity": "Skal nulstilles den 1. i måneden og have last_reset (utility meter).",
+          "threshold": "Clevers grænse inkl. moms; tillægget er den del af gennemsnittet, der ligger over.",
+          "vat_percent": "Lægges på spotprisen før sammenligning."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Integrationen er allerede sat op.",
+      "single_instance_allowed": "Integrationen er allerede sat op."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Clever energitillæg",
+        "data": {
+          "energy_entity": "Månedlig energisensor (valgfri)",
+          "threshold": "Grundsats",
+          "vat_percent": "Moms"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "rate": {
+        "name": "Foreløbig sats"
+      },
+      "national_average": {
+        "name": "Landsgennemsnit"
+      },
+      "average_dk1": {
+        "name": "Gennemsnit DK1"
+      },
+      "average_dk2": {
+        "name": "Gennemsnit DK2"
+      },
+      "last_fetch": {
+        "name": "Seneste hentning"
+      },
+      "surcharge": {
+        "name": "Foreløbigt energitillæg"
+      }
+    }
+  }
+}

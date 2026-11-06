@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.coverage
+.venv/
+.ha-venv/
+test-output.txt
+REPORT.md

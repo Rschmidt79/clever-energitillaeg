@@ -3,16 +3,16 @@
     "step": {
       "user": {
         "title": "Clever energitillæg",
-        "description": "Foreløbig sats ud fra Energinets day-ahead-priser (DK1/DK2 50/50, inkl. moms). Vælg evt. en energisensor, der nulstilles hver måned (fx en utility meter med cycle: monthly), for at få det foreløbige tillæg i kroner.",
+        "description": "Foreløbig sats ud fra Energinets day-ahead-priser (DK1/DK2 50/50, inkl. moms). Vælg evt. en eller flere energisensorer, der nulstilles hver måned (fx en utility meter med cycle: monthly), for at få et foreløbigt tillæg i kroner for hver.",
         "data": {
-          "energy_entity": "Månedlig energisensor (valgfri)",
           "threshold": "Grundsats",
-          "vat_percent": "Moms"
+          "vat_percent": "Moms",
+          "energy_entities": "Månedlige energisensorer (valgfri)"
         },
         "data_description": {
-          "energy_entity": "Skal nulstilles den 1. i måneden og have last_reset (utility meter).",
           "threshold": "Clevers grænse inkl. moms; tillægget er den del af gennemsnittet, der ligger over.",
-          "vat_percent": "Lægges på spotprisen før sammenligning."
+          "vat_percent": "Lægges på spotprisen før sammenligning.",
+          "energy_entities": "Hver sensor får sit eget foreløbige energitillæg. Den skal nulstilles den 1. i måneden og have last_reset (utility meter)."
         }
       }
     },
@@ -26,9 +26,9 @@
       "init": {
         "title": "Clever energitillæg",
         "data": {
-          "energy_entity": "Månedlig energisensor (valgfri)",
           "threshold": "Grundsats",
-          "vat_percent": "Moms"
+          "vat_percent": "Moms",
+          "energy_entities": "Månedlige energisensorer (valgfri)"
         }
       }
     }
@@ -49,9 +49,6 @@
       },
       "last_fetch": {
         "name": "Seneste hentning"
-      },
-      "surcharge": {
-        "name": "Foreløbigt energitillæg"
       }
     }
   }

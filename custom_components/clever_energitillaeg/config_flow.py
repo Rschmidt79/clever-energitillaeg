@@ -1,4 +1,4 @@
-"""UI setup: optional monthly energy sensor, threshold and VAT."""
+"""UI setup: optional monthly energy sensors, threshold and VAT."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
-    CONF_ENERGY_ENTITY,
+    CONF_ENERGY_ENTITIES,
     CONF_THRESHOLD,
     CONF_VAT,
     DEFAULT_THRESHOLD,
@@ -28,12 +28,14 @@ from .const import (
 
 SCHEMA = vol.Schema(
     {
-        vol.Optional(CONF_ENERGY_ENTITY): EntitySelector(
-            EntitySelectorConfig(domain="sensor", device_class=SensorDeviceClass.ENERGY)
+        vol.Optional(CONF_ENERGY_ENTITIES): EntitySelector(
+            EntitySelectorConfig(
+                domain="sensor", device_class=SensorDeviceClass.ENERGY, multiple=True
+            )
         ),
         vol.Required(CONF_THRESHOLD, default=DEFAULT_THRESHOLD): NumberSelector(
             NumberSelectorConfig(
-                min=0, max=10, step=0.01, mode=NumberSelectorMode.BOX, unit_of_measurement="DKK/kWh"
+                min=0, max=10, step=0.01, mode=NumberSelectorMode.BOX, unit_of_measurement="kr./kWh"
             )
         ),
         vol.Required(CONF_VAT, default=DEFAULT_VAT): NumberSelector(
@@ -46,7 +48,7 @@ SCHEMA = vol.Schema(
 
 
 class CleverConfigFlow(ConfigFlow, domain=DOMAIN):
-    VERSION = 1
+    VERSION = 2
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         await self.async_set_unique_id(DOMAIN)

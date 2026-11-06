@@ -77,11 +77,14 @@ def http(aioclient_mock):
     return Http(aioclient_mock)
 
 
-def make_entry(**options) -> MockConfigEntry:
+def make_entry(version: int = 2, **options) -> MockConfigEntry:
     opts = {"threshold": 0.89, "vat_percent": 25.0} | options
+    if version == 2 and "energy_entity" in opts:
+        opts["energy_entities"] = [opts.pop("energy_entity")]
     return MockConfigEntry(
         domain=DOMAIN,
         title="Clever energitillæg",
+        version=version,
         data={},
         options=opts,
         unique_id=DOMAIN,

@@ -31,9 +31,10 @@ async def test_user_flow_with_energy_entity(hass, dk_time, http):
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"energy_entity": "sensor.e", "threshold": 0.89, "vat_percent": 25.0}
+        result["flow_id"],
+        {"energy_entities": ["sensor.e", "sensor.f"], "threshold": 0.89, "vat_percent": 25.0},
     )
-    assert result["options"]["energy_entity"] == "sensor.e"
+    assert result["options"]["energy_entities"] == ["sensor.e", "sensor.f"]
 
 
 async def test_options_flow_set_and_clear_energy_entity(hass, dk_time, http):
@@ -45,14 +46,18 @@ async def test_options_flow_set_and_clear_energy_entity(hass, dk_time, http):
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] is FlowResultType.FORM
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {"energy_entity": "sensor.e", "threshold": 0.95, "vat_percent": 25.0}
+        result["flow_id"], {"energy_entities": ["sensor.e"], "threshold": 0.95, "vat_percent": 25.0}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     await hass.async_block_till_done()
-    assert entry.options == {"energy_entity": "sensor.e", "threshold": 0.95, "vat_percent": 25.0}
+    assert entry.options == {
+        "energy_entities": ["sensor.e"],
+        "threshold": 0.95,
+        "vat_percent": 25.0,
+    }
     result = await hass.config_entries.options.async_init(entry.entry_id)
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"threshold": 0.95, "vat_percent": 25.0}
     )
     await hass.async_block_till_done()
-    assert "energy_entity" not in entry.options
+    assert "energy_entities" not in entry.options

@@ -37,7 +37,7 @@ class CleverData:
     """What the entities show. result is None when there is no valid calculation."""
 
     month: str
-    status: str  # ok | error | no_data
+    status: str  # ok | fejl | ingen_data
     result: MonthResult | None
     fetched: datetime | None  # last successful fetch
     last_attempt: datetime
@@ -96,11 +96,11 @@ class CleverCoordinator(DataUpdateCoordinator[CleverData]):
             prev = self._previous(month)
             if prev is not None:
                 return replace(
-                    prev, status="error", error=str(err), http_status=err.status, last_attempt=now
+                    prev, status="fejl", error=str(err), http_status=err.status, last_attempt=now
                 )
             return CleverData(
                 month=month,
-                status="error",
+                status="fejl",
                 result=None,
                 fetched=None,
                 last_attempt=now,
@@ -111,7 +111,7 @@ class CleverCoordinator(DataUpdateCoordinator[CleverData]):
         if not result.included_days:
             return CleverData(
                 month=month,
-                status="no_data",
+                status="ingen_data",
                 result=None,
                 fetched=now,
                 last_attempt=now,

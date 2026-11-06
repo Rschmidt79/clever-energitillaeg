@@ -1,4 +1,4 @@
-"""Rate, averages, last fetch and the optional preliminary surcharge."""
+"""Rate, averages, last fetch and one preliminary surcharge per selected energy sensor."""
 
 from __future__ import annotations
 
@@ -9,16 +9,18 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN, EntityCategory, UnitOfEnergy
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_change
 from homeassistant.util import dt as dt_util
 
+from . import surcharge_key, surcharge_object_id
 from .calc import month_of
-from .const import CONF_ENERGY_ENTITY
+from .const import CONF_ENERGY_ENTITIES
 from .coordinator import CleverCoordinator
 from .entity import CleverEntity
 
-PRICE_UNIT = "DKK/kWh"
+PRICE_UNIT = "kr./kWh"
 NOTE = (
     "Foreløbig sats ud fra de dage, der indgår. Den kan ændre sig frem til månedens afslutning; "
     "Clever fastsætter den endelige sats efter månedens udløb."
@@ -41,10 +43,26 @@ async def async_setup_entry(
         AverageSensor(coordinator, "average_dk2", "DK2"),
         LastFetchSensor(coordinator),
     ]
-    energy_entity = entry.options.get(CONF_ENERGY_ENTITY, entry.data.get(CONF_ENERGY_ENTITY))
-    if energy_entity:
-        entities.append(SurchargeSensor(coordinator, energy_entity))
+    energy_entities = list(dict.fromkeys(entry.options.get(CONF_ENERGY_ENTITIES) or []))
+    entities.extend(SurchargeSensor(coordinator, e) for e in energy_entities)
+    # Surcharges for sensors no longer selected are removed, not left as orphans.
+    registry = er.async_get(hass)
+    wanted = {f"{entry.entry_id}_{surcharge_key(e)}" for e in energy_entities}
+    for ent in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if ent.unique_id.startswith(f"{entry.entry_id}_surcharge") and ent.unique_id not in wanted:
+            registry.async_remove(ent.entity_id)
     async_add_entities(entities)
+
+
+def energy_name(hass: HomeAssistant, entity_id: str) -> str:
+    """The energy sensor's display name, for naming its surcharge."""
+    if state := hass.states.get(entity_id):
+        if name := state.attributes.get("friendly_name"):
+            return str(name)
+    if ent := er.async_get(hass).async_get(entity_id):
+        if name := ent.name or ent.original_name:
+            return name
+    return entity_id.split(".", 1)[-1]
 
 
 class RateSensor(CleverEntity, SensorEntity):
@@ -69,27 +87,27 @@ class RateSensor(CleverEntity, SensorEntity):
             return {"note": NOTE}
         res = data.result
         attrs: dict[str, Any] = {
-            "month": data.month,
+            "maaned": data.month,
             "status": data.status,
-            "error": data.error,
+            "fejl": data.error,
             "http_status": data.http_status,
-            "fetched": data.fetched.isoformat() if data.fetched else None,
-            "last_attempt": data.last_attempt.isoformat(),
-            "threshold": self.coordinator.threshold,
-            "vat_percent": self.coordinator.vat,
+            "hentet": data.fetched.isoformat() if data.fetched else None,
+            "sidste_forsoeg": data.last_attempt.isoformat(),
+            "grundsats": self.coordinator.threshold,
+            "moms_procent": self.coordinator.vat,
             "note": NOTE,
         }
         if res is not None:
             attrs.update(
-                days_in_month=res.days_in_month,
-                included_day_count=len(res.included_days),
-                included_days=res.included_days,
-                missing_days=res.missing_days,
-                pending_days=res.pending_days,
-                includes_future_days=res.includes_future_days,
-                intervals_dk1=res.intervals.get("DK1"),
-                intervals_dk2=res.intervals.get("DK2"),
-                raw_rate=res.raw_rate,
+                dage_i_maaned=res.days_in_month,
+                antal_dage_indgaar=len(res.included_days),
+                dage_indgaar=res.included_days,
+                manglende_dage=res.missing_days,
+                afventer_dage=res.pending_days,
+                medtager_dage_efter_i_dag=res.includes_future_days,
+                intervaller_dk1=res.intervals.get("DK1"),
+                intervaller_dk2=res.intervals.get("DK2"),
+                sats_raa=res.raw_rate,
             )
         return attrs
 
@@ -117,7 +135,7 @@ class AverageSensor(CleverEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         data = self.coordinator.data
-        return {"month": data.month, "status": data.status} if data else None
+        return {"maaned": data.month, "status": data.status} if data else None
 
 
 class LastFetchSensor(CleverEntity, SensorEntity):
@@ -136,14 +154,18 @@ class LastFetchSensor(CleverEntity, SensorEntity):
 class SurchargeSensor(CleverEntity, SensorEntity):
     """rate × the month's energy. Unavailable unless both belong to the current month."""
 
-    _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_native_unit_of_measurement = "DKK"
+    _attr_native_unit_of_measurement = "kr."
     _attr_suggested_display_precision = 2
     _attr_icon = "mdi:cash-plus"
 
     def __init__(self, coordinator: CleverCoordinator, energy_entity: str) -> None:
-        super().__init__(coordinator, "surcharge")
+        super().__init__(
+            coordinator, surcharge_key(energy_entity), surcharge_object_id(energy_entity)
+        )
         self._energy_entity = energy_entity
+        self._attr_name = (
+            f"Foreløbigt energitillæg – {energy_name(coordinator.hass, energy_entity)}"
+        )
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -165,25 +187,25 @@ class SurchargeSensor(CleverEntity, SensorEntity):
         """Energy in kWh, or None with the reason it cannot be used."""
         state: State | None = self.hass.states.get(self._energy_entity)
         if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-            return None, "energy_unavailable"
+            return None, "energi_utilgaengelig"
         factor = ENERGY_FACTOR.get(state.attributes.get("unit_of_measurement"))
         if factor is None:
-            return None, "energy_unit"
+            return None, "energi_enhed"
         try:
             value = float(state.state) * factor
         except ValueError:
-            return None, "energy_unavailable"
+            return None, "energi_utilgaengelig"
         last_reset = dt_util.parse_datetime(str(state.attributes.get("last_reset") or ""))
         if last_reset is None or month_of(last_reset) != month_of(dt_util.now()):
-            return None, "energy_not_reset_this_month"
+            return None, "energi_ikke_nulstillet_denne_maaned"
         return value, None
 
     def _value(self) -> tuple[float | None, str | None, float | None]:
         data = self.coordinator.data
         if not data or not data.result or data.result.rate is None:
-            return None, "no_rate", None
+            return None, "ingen_sats", None
         if data.month != month_of(dt_util.now()):
-            return None, "rate_from_other_month", None
+            return None, "sats_fra_anden_maaned", None
         kwh, reason = self._energy_kwh()
         if kwh is None:
             return None, reason, None
@@ -207,10 +229,10 @@ class SurchargeSensor(CleverEntity, SensorEntity):
         data = self.coordinator.data
         _, _, kwh = self._value()
         return {
-            "energy_entity": self._energy_entity,
-            "energy_kwh": kwh,
-            "rate": data.result.rate if data and data.result else None,
-            "month": data.month if data else None,
+            "energisensor": self._energy_entity,
+            "energi_kwh": kwh,
+            "sats": data.result.rate if data and data.result else None,
+            "maaned": data.month if data else None,
             "note": "Foreløbigt: sats × energisensorens månedsforbrug. Clever henfører en opladning "
             "til den måned, hvor den stopper, og bruger egne målinger.",
         }

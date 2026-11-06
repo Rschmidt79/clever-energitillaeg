@@ -19,11 +19,12 @@ ENERGY = "sensor.monthly_energy"
 
 def ids(hass):
     reg = er.async_get(hass)
-    return {
-        e.translation_key: e.entity_id
-        for e in reg.entities.values()
-        if e.platform == "clever_energitillaeg"
-    }
+    out = {}
+    for e in reg.entities.values():
+        if e.platform == "clever_energitillaeg":
+            key = e.unique_id.split("_", 1)[1]
+            out["surcharge" if key == f"surcharge_{ENERGY}" else key] = e.entity_id
+    return out
 
 
 async def setup(hass, http, payload=None, **options):
@@ -61,10 +62,14 @@ async def test_setup_current_month(hass, dk_time, http):
     e = ids(hass)
     rate = hass.states.get(e["rate"])
     a = rate.attributes
-    assert rate.state == "1.59" and a["status"] == "ok" and a["month"] == "2026-11"
-    assert a["included_days"] == [f"2026-11-{d:02d}" for d in range(1, 8)]
-    assert a["includes_future_days"] is True and a["pending_days"] == 23 and a["missing_days"] == []
-    assert a["raw_rate"] == 1.5943 and "månedens afslutning" in a["note"]
+    assert rate.state == "1.59" and a["status"] == "ok" and a["maaned"] == "2026-11"
+    assert a["dage_indgaar"] == [f"2026-11-{d:02d}" for d in range(1, 8)]
+    assert (
+        a["medtager_dage_efter_i_dag"] is True
+        and a["afventer_dage"] == 23
+        and a["manglende_dage"] == []
+    )
+    assert a["sats_raa"] == 1.5943 and "månedens afslutning" in a["note"]
     assert hass.states.get(e["national_average"]).state == "2.4843"
     assert hass.states.get(e["average_dk1"]).state == "2.4147"
     assert hass.states.get(e["average_dk2"]).state == "2.554"
@@ -116,9 +121,9 @@ async def test_failed_fetch_keeps_last_good_value(hass, dk_time, http, kind):
     }[kind]()
     await at(hass, dk_time, local(2026, 11, 7, 14, 30))
     s = hass.states.get(e["rate"])
-    assert s.state == good.state and s.attributes["status"] == "error"
-    assert s.attributes["fetched"] == good.attributes["fetched"]
-    assert s.attributes["last_attempt"].startswith("2026-11-07T14:31")
+    assert s.state == good.state and s.attributes["status"] == "fejl"
+    assert s.attributes["hentet"] == good.attributes["hentet"]
+    assert s.attributes["sidste_forsoeg"].startswith("2026-11-07T14:31")
     assert hass.states.get(e["surcharge"]).state == "159.0"
     # Evening retry because today's fetch failed.
     http.respond(body(month_records("2026-11")))
@@ -133,7 +138,7 @@ async def test_failure_without_previous_value_is_unknown(hass, dk_time, http):
     assert entry.state is ConfigEntryState.LOADED
     e = ids(hass)
     s = hass.states.get(e["rate"])
-    assert s.state == "unknown" and s.attributes["status"] == "error"
+    assert s.state == "unknown" and s.attributes["status"] == "fejl"
     assert hass.states.get(e["national_average"]).state == "unknown"
     assert hass.states.get(e["surcharge"]).state == "unavailable"
 
@@ -143,7 +148,7 @@ async def test_no_complete_day_is_unknown(hass, dk_time, http):
         hass, http, month_records("2026-11", lambda r: [x for x in r if x["PriceArea"] == "DK1"])
     )
     s = hass.states.get(ids(hass)["rate"])
-    assert s.state == "unknown" and s.attributes["status"] == "no_data"
+    assert s.state == "unknown" and s.attributes["status"] == "ingen_data"
 
 
 async def test_rate_limit_retried_once(hass, dk_time, http):
@@ -204,7 +209,7 @@ async def test_month_change(hass, freezer, http):
     )
     await at(hass, freezer, local(2026, 11, 1, 0, 5))
     s = hass.states.get(e["rate"])
-    assert s.attributes["month"] == "2026-11" and s.attributes["included_days"] == [
+    assert s.attributes["maaned"] == "2026-11" and s.attributes["dage_indgaar"] == [
         "2026-11-01",
         "2026-11-02",
     ]
@@ -219,7 +224,7 @@ async def test_failed_fetch_in_new_month_drops_old_value(hass, freezer, http):
     http.respond({"statusCode": 503}, status=503)
     await at(hass, freezer, local(2026, 11, 1, 0, 5))
     s = hass.states.get(ids(hass)["rate"])
-    assert s.state == "unknown" and s.attributes["month"] == "2026-11"
+    assert s.state == "unknown" and s.attributes["maaned"] == "2026-11"
 
 
 async def test_restart_with_failed_fetch_uses_stored_month(hass, dk_time, http, hass_storage):
@@ -230,7 +235,7 @@ async def test_restart_with_failed_fetch_uses_stored_month(hass, dk_time, http, 
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     s = hass.states.get(ids(hass)["rate"])
-    assert s.state == good and s.attributes["status"] == "error"
+    assert s.state == good and s.attributes["status"] == "fejl"
 
 
 async def test_options_change_reloads_and_recalculates(hass, dk_time, http):
@@ -239,7 +244,7 @@ async def test_options_change_reloads_and_recalculates(hass, dk_time, http):
     hass.config_entries.async_update_entry(entry, options={"threshold": 1.0, "vat_percent": 25.0})
     await hass.async_block_till_done()
     s = hass.states.get(ids(hass)["rate"])
-    assert s.state == str(round(1.5943 + 0.89 - 1.0, 2)) and s.attributes["threshold"] == 1.0
+    assert s.state == str(round(1.5943 + 0.89 - 1.0, 2)) and s.attributes["grundsats"] == 1.0
 
 
 async def test_saved_production_response(hass, dk_time, http):
@@ -262,3 +267,112 @@ async def test_diagnostics(hass, dk_time, http):
     diag = await async_get_config_entry_diagnostics(hass, entry)
     assert diag["status"] == "ok" and diag["result"]["rate"] == 1.59
     assert diag["options"] == {"threshold": 0.89, "vat_percent": 25.0}
+
+
+async def test_danish_entity_ids_and_names(hass, dk_time, http):
+    energy(hass, "10")
+    await setup(hass, http, month_records("2026-11"), energy_entity=ENERGY)
+    e = ids(hass)
+    assert e == {
+        "rate": "sensor.clever_energitillaeg_foreloebig_sats",
+        "national_average": "sensor.clever_energitillaeg_landsgennemsnit",
+        "average_dk1": "sensor.clever_energitillaeg_gennemsnit_dk1",
+        "average_dk2": "sensor.clever_energitillaeg_gennemsnit_dk2",
+        "last_fetch": "sensor.clever_energitillaeg_seneste_hentning",
+        "surcharge": "sensor.clever_energitillaeg_foreloebigt_energitillaeg_monthly_energy",
+    }
+    rate = hass.states.get(e["rate"])
+    assert rate.attributes["friendly_name"] == "Clever energitillæg Foreløbig sats"
+    assert hass.states.get(e["surcharge"]).attributes["friendly_name"] == (
+        "Clever energitillæg Foreløbigt energitillæg – monthly_energy"
+    )
+    assert rate.attributes["unit_of_measurement"] == "kr./kWh"
+    t = hass.states.get(e["surcharge"])
+    assert t.attributes["unit_of_measurement"] == "kr." and t.attributes["energisensor"] == ENERGY
+
+
+async def test_migrates_0_1_0_entry_ids_and_single_sensor(hass, dk_time, http):
+    """0.1.0: config version 1, one energy_entity, English entity ids -> Danish, history kept."""
+    from custom_components.clever_energitillaeg.const import OLD_OBJECT_IDS
+
+    entry = make_entry(version=1, energy_entity=ENERGY)
+    entry.add_to_hass(hass)
+    reg = er.async_get(hass)
+    for key, old in OLD_OBJECT_IDS.items():
+        reg.async_get_or_create(
+            "sensor",
+            "clever_energitillaeg",
+            f"{entry.entry_id}_{key}",
+            suggested_object_id=f"clever_energitillaeg_{old}",
+            config_entry=entry,
+        )
+    old_surcharge = reg.async_get("sensor.clever_energitillaeg_preliminary_surcharge")
+    # A user-chosen id is left alone.
+    reg.async_update_entity(
+        "sensor.clever_energitillaeg_average_dk2", new_entity_id="sensor.mit_eget_navn"
+    )
+    energy(hass, "10")
+    http.respond(body(month_records("2026-11")))
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.version == 2 and entry.options == {
+        "threshold": 0.89,
+        "vat_percent": 25.0,
+        "energy_entities": [ENERGY],
+    }
+    e = ids(hass)
+    assert e["rate"] == "sensor.clever_energitillaeg_foreloebig_sats"
+    assert e["surcharge"] == "sensor.clever_energitillaeg_foreloebigt_energitillaeg_monthly_energy"
+    assert e["average_dk2"] == "sensor.mit_eget_navn"
+    # Same registry entry (renamed, not recreated): the recorder keeps its history.
+    assert reg.async_get(e["surcharge"]).id == old_surcharge.id
+    assert len([x for x in reg.entities.values() if x.platform == "clever_energitillaeg"]) == 6
+    assert hass.states.get("sensor.clever_energitillaeg_foreloebig_sats").state == "1.59"
+    assert hass.states.get(e["surcharge"]).state == "15.9"
+    assert hass.states.get("sensor.clever_energitillaeg_preliminary_rate") is None
+
+
+async def test_migrates_0_1_0_entry_without_energy_sensor(hass, dk_time, http):
+    entry = make_entry(version=1)
+    entry.add_to_hass(hass)
+    http.respond(body(month_records("2026-11")))
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    assert entry.version == 2 and entry.options["energy_entities"] == []
+
+
+async def test_several_energy_sensors_each_get_a_surcharge(hass, dk_time, http):
+    energy(hass, "100")
+    hass.states.async_set(
+        "sensor.bil_to",
+        "50",
+        {
+            "unit_of_measurement": "kWh",
+            "device_class": "energy",
+            "friendly_name": "Bil to i måneden",
+            "last_reset": "2026-10-31T23:00:00+00:00",
+        },
+    )
+    entry = await setup(
+        hass, http, month_records("2026-11"), energy_entities=[ENERGY, "sensor.bil_to"]
+    )
+    one = hass.states.get("sensor.clever_energitillaeg_foreloebigt_energitillaeg_monthly_energy")
+    two = hass.states.get("sensor.clever_energitillaeg_foreloebigt_energitillaeg_bil_to")
+    assert one.state == "159.0" and two.state == "79.5"
+    assert two.attributes["friendly_name"] == (
+        "Clever energitillæg Foreløbigt energitillæg – Bil to i måneden"
+    )
+    # Deselecting a sensor removes its surcharge entity (no orphan).
+    http.respond(body(month_records("2026-11")))
+    hass.config_entries.async_update_entry(
+        entry, options=entry.options | {"energy_entities": ["sensor.bil_to"]}
+    )
+    await hass.async_block_till_done()
+    reg = er.async_get(hass)
+    assert (
+        reg.async_get("sensor.clever_energitillaeg_foreloebigt_energitillaeg_monthly_energy")
+        is None
+    )
+    assert (
+        hass.states.get("sensor.clever_energitillaeg_foreloebigt_energitillaeg_bil_to").state
+        == "79.5"
+    )

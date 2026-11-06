@@ -2,33 +2,33 @@
   "config": {
     "step": {
       "user": {
-        "title": "Clever energy surcharge",
-        "description": "Preliminary rate from Energinet day-ahead prices (DK1/DK2 50/50, incl. VAT). Optionally pick an energy sensor that resets every month (e.g. a utility meter with cycle: monthly) to get the preliminary surcharge in DKK.",
+        "title": "Clever energitillæg",
+        "description": "Foreløbig sats ud fra Energinets day-ahead-priser (DK1/DK2 50/50, inkl. moms). Vælg evt. en eller flere energisensorer, der nulstilles hver måned (fx en utility meter med cycle: monthly), for at få et foreløbigt tillæg i kroner for hver.",
         "data": {
-          "energy_entity": "Monthly energy sensor (optional)",
-          "threshold": "Threshold",
-          "vat_percent": "VAT"
+          "threshold": "Grundsats",
+          "vat_percent": "Moms",
+          "energy_entities": "Månedlige energisensorer (valgfri)"
         },
         "data_description": {
-          "energy_entity": "Must reset on the 1st of the month and provide last_reset (utility meter).",
-          "threshold": "Clever's threshold incl. VAT; the surcharge is the part of the average above it.",
-          "vat_percent": "Added to the spot price before comparing."
+          "threshold": "Clevers grænse inkl. moms; tillægget er den del af gennemsnittet, der ligger over.",
+          "vat_percent": "Lægges på spotprisen før sammenligning.",
+          "energy_entities": "Hver sensor får sit eget foreløbige energitillæg. Den skal nulstilles den 1. i måneden og have last_reset (utility meter)."
         }
       }
     },
     "abort": {
-      "already_configured": "Already configured.",
-      "single_instance_allowed": "Already configured."
+      "already_configured": "Integrationen er allerede sat op.",
+      "single_instance_allowed": "Integrationen er allerede sat op."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Clever energy surcharge",
+        "title": "Clever energitillæg",
         "data": {
-          "energy_entity": "Monthly energy sensor (optional)",
-          "threshold": "Threshold",
-          "vat_percent": "VAT"
+          "threshold": "Grundsats",
+          "vat_percent": "Moms",
+          "energy_entities": "Månedlige energisensorer (valgfri)"
         }
       }
     }
@@ -36,22 +36,19 @@
   "entity": {
     "sensor": {
       "rate": {
-        "name": "Preliminary rate"
+        "name": "Foreløbig sats"
       },
       "national_average": {
-        "name": "National average"
+        "name": "Landsgennemsnit"
       },
       "average_dk1": {
-        "name": "Average DK1"
+        "name": "Gennemsnit DK1"
       },
       "average_dk2": {
-        "name": "Average DK2"
+        "name": "Gennemsnit DK2"
       },
       "last_fetch": {
-        "name": "Last fetch"
-      },
-      "surcharge": {
-        "name": "Preliminary surcharge"
+        "name": "Seneste hentning"
       }
     }
   }

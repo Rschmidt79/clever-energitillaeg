@@ -1,7 +1,9 @@
 {
   "domain": "clever_energitillaeg",
   "name": "Clever energitillæg",
-  "codeowners": ["@Rschmidt79"],
+  "codeowners": [
+    "@Rschmidt79"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/Rschmidt79/clever-energitillaeg",
   "integration_type": "service",
@@ -9,5 +11,5 @@
   "issue_tracker": "https://github.com/Rschmidt79/clever-energitillaeg/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.1.0"
+  "version": "0.2.0"
 }

@@ -42,14 +42,15 @@ Attributten `dage` indeholder én post pr. dag, der indgår:
   sats: 1.50                  # energitillægssats efter dagen
 ```
 
-Med [ApexCharts Card](https://github.com/RomRider/apexcharts-card) (HACS → Frontend) kan du tegne den samme graf som på Clevers side: søjler for hver dag, linjer for månedens gennemsnit og satsen og en vandret linje ved 0,89. Kortet til sidste måned bruger `sensor.clever_energitillaeg_sats_sidste_maaned` og `offset: -31d`.
+Med [ApexCharts Card](https://github.com/RomRider/apexcharts-card) (HACS → Frontend) kan du tegne den samme graf som på Clevers side: søjler for hver dag, linjer for månedens gennemsnit og satsen og en vandret linje ved 0,89. Headeren viser den aktuelle sats og månedens gennemsnit, og den nyeste værdi står også ved linjerne. Kortet til sidste måned bruger `sensor.clever_energitillaeg_sats_sidste_maaned` og `offset: -31d`.
 
 ```yaml
 - type: custom:apexcharts-card
   header:
     show: true
     title: Clever energitillæg · denne måned
-    show_states: false
+    show_states: true
+    colorize_states: true
   graph_span: 31d
   span:
     start: month
@@ -59,11 +60,16 @@ Med [ApexCharts Card](https://github.com/RomRider/apexcharts-card) (HACS → Fro
     decimals: 2
   all_series_config:
     show:
-      in_header: false
       legend_value: false
   apex_config:
     legend:
       show: true
+    dataLabels:
+      enabled: true
+      enabledOnSeries:
+      - 1
+      - 2
+      formatter: 'EVAL:function(v, o) { const d = o.w.config.series[o.seriesIndex].data; return o.dataPointIndex === d.length - 1 ? v.toFixed(2).replace(''.'', '','') + '' kr'' : ''''; }'
     tooltip:
       shared: true
       x:
@@ -78,18 +84,28 @@ Med [ApexCharts Card](https://github.com/RomRider/apexcharts-card) (HACS → Fro
     type: column
     color: '#7dd3dc'
     data_generator: return (entity.attributes.dage || []).map(d => [new Date(d.dato + "T12:00:00").getTime(), d.dagsgennemsnit]);
-  - entity: sensor.clever_energitillaeg_foreloebig_sats
-    name: Gns. spotpris måned
+    show:
+      in_header: false
+  - name: Gns. spotpris måned
     type: line
     color: '#c3c24a'
     stroke_width: 2
-    data_generator: return (entity.attributes.dage || []).map(d => [new Date(d.dato + "T12:00:00").getTime(), d.maanedsgennemsnit]);
+    unit: kr./kWh
+    float_precision: 2
+    show:
+      in_header: true
+    entity: sensor.clever_energitillaeg_landsgennemsnit
+    data_generator: return (hass.states['sensor.clever_energitillaeg_foreloebig_sats'].attributes.dage || []).map(d => [new Date(d.dato + "T12:00:00").getTime(), d.maanedsgennemsnit]);
   - entity: sensor.clever_energitillaeg_foreloebig_sats
     name: Energitillægssats
     type: line
     color: '#a033b0'
     stroke_width: 2
     data_generator: return (entity.attributes.dage || []).map(d => [new Date(d.dato + "T12:00:00").getTime(), d.sats]);
+    unit: kr./kWh
+    float_precision: 2
+    show:
+      in_header: true
   - entity: sensor.clever_energitillaeg_foreloebig_sats
     name: Grundsats
     type: line
@@ -100,11 +116,14 @@ Med [ApexCharts Card](https://github.com/RomRider/apexcharts-card) (HACS → Fro
       const n = new Date(m[0], m[1], 0).getDate(); const g = entity.attributes.grundsats || 0.89;
 
       return Array.from({length: n}, (_, i) => [new Date(m[0], m[1] - 1, i + 1, 12).getTime(), g]);'
+    show:
+      in_header: false
 - type: custom:apexcharts-card
   header:
     show: true
     title: Clever energitillæg · sidste måned
-    show_states: false
+    show_states: true
+    colorize_states: true
   graph_span: 31d
   span:
     start: month
@@ -115,11 +134,16 @@ Med [ApexCharts Card](https://github.com/RomRider/apexcharts-card) (HACS → Fro
     decimals: 2
   all_series_config:
     show:
-      in_header: false
       legend_value: false
   apex_config:
     legend:
       show: true
+    dataLabels:
+      enabled: true
+      enabledOnSeries:
+      - 1
+      - 2
+      formatter: 'EVAL:function(v, o) { const d = o.w.config.series[o.seriesIndex].data; return o.dataPointIndex === d.length - 1 ? v.toFixed(2).replace(''.'', '','') + '' kr'' : ''''; }'
     tooltip:
       shared: true
       x:
@@ -134,11 +158,18 @@ Med [ApexCharts Card](https://github.com/RomRider/apexcharts-card) (HACS → Fro
     type: column
     color: '#7dd3dc'
     data_generator: return (entity.attributes.dage || []).map(d => [new Date(d.dato + "T12:00:00").getTime(), d.dagsgennemsnit]);
-  - entity: sensor.clever_energitillaeg_sats_sidste_maaned
-    name: Gns. spotpris måned
+    show:
+      in_header: false
+  - name: Gns. spotpris måned
     type: line
     color: '#c3c24a'
     stroke_width: 2
+    unit: kr./kWh
+    float_precision: 2
+    show:
+      in_header: true
+    entity: sensor.clever_energitillaeg_sats_sidste_maaned
+    attribute: landsgennemsnit
     data_generator: return (entity.attributes.dage || []).map(d => [new Date(d.dato + "T12:00:00").getTime(), d.maanedsgennemsnit]);
   - entity: sensor.clever_energitillaeg_sats_sidste_maaned
     name: Energitillægssats
@@ -146,6 +177,10 @@ Med [ApexCharts Card](https://github.com/RomRider/apexcharts-card) (HACS → Fro
     color: '#a033b0'
     stroke_width: 2
     data_generator: return (entity.attributes.dage || []).map(d => [new Date(d.dato + "T12:00:00").getTime(), d.sats]);
+    unit: kr./kWh
+    float_precision: 2
+    show:
+      in_header: true
   - entity: sensor.clever_energitillaeg_sats_sidste_maaned
     name: Grundsats
     type: line
@@ -156,6 +191,8 @@ Med [ApexCharts Card](https://github.com/RomRider/apexcharts-card) (HACS → Fro
       const n = new Date(m[0], m[1], 0).getDate(); const g = entity.attributes.grundsats || 0.89;
 
       return Array.from({length: n}, (_, i) => [new Date(m[0], m[1] - 1, i + 1, 12).getTime(), g]);'
+    show:
+      in_header: false
 ```
 
 Uden ApexCharts kan du bruge et almindeligt historik- eller statistikkort med `sensor.clever_energitillaeg_foreloebig_sats` og `sensor.clever_energitillaeg_landsgennemsnit`. Det viser, hvordan satsen har udviklet sig fra dag til dag.

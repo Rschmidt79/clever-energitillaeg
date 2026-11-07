@@ -49,6 +49,9 @@
       },
       "last_fetch": {
         "name": "Seneste hentning"
+      },
+      "last_month_rate": {
+        "name": "Sats sidste måned"
       }
     }
   }

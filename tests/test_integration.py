@@ -76,7 +76,7 @@ async def test_setup_current_month(hass, dk_time, http):
     assert hass.states.get(e["last_fetch"]).state.startswith("2026-11-06T08:00")
     assert hass.states.get(e["surcharge"]).state == str(round(1.59 * 189.574, 2))
     q = str(http.calls[0][1])
-    assert "start=2026-11-01T00:00" in q and "end=2026-12-01T00:00" in q and "limit=0" in q
+    assert "start=2026-10-01T00:00" in q and "end=2026-12-01T00:00" in q and "limit=0" in q
     energy(hass, "200")
     await hass.async_block_till_done()
     assert hass.states.get(e["surcharge"]).state == "318.0" and len(http.calls) == 1
@@ -213,7 +213,7 @@ async def test_month_change(hass, freezer, http):
         "2026-11-01",
         "2026-11-02",
     ]
-    assert "start=2026-11-01T00:00" in str(http.calls[-1][1])
+    assert "start=2026-10-01T00:00" in str(http.calls[-1][1])
     assert hass.states.get(e["surcharge"]).state == "0.0"
 
 
@@ -280,6 +280,10 @@ async def test_danish_entity_ids_and_names(hass, dk_time, http):
         "average_dk2": "sensor.clever_energitillaeg_gennemsnit_dk2",
         "last_fetch": "sensor.clever_energitillaeg_seneste_hentning",
         "surcharge": "sensor.clever_energitillaeg_foreloebigt_energitillaeg_monthly_energy",
+        "last_month_rate": "sensor.clever_energitillaeg_sats_sidste_maaned",
+        "last_month_surcharge_sensor.monthly_energy": (
+            "sensor.clever_energitillaeg_energitillaeg_sidste_maaned_monthly_energy"
+        ),
     }
     rate = hass.states.get(e["rate"])
     assert rate.attributes["friendly_name"] == "Clever energitillæg Foreløbig sats"
@@ -326,7 +330,7 @@ async def test_migrates_0_1_0_entry_ids_and_single_sensor(hass, dk_time, http):
     assert e["average_dk2"] == "sensor.mit_eget_navn"
     # Same registry entry (renamed, not recreated): the recorder keeps its history.
     assert reg.async_get(e["surcharge"]).id == old_surcharge.id
-    assert len([x for x in reg.entities.values() if x.platform == "clever_energitillaeg"]) == 6
+    assert len([x for x in reg.entities.values() if x.platform == "clever_energitillaeg"]) == 8
     assert hass.states.get("sensor.clever_energitillaeg_foreloebig_sats").state == "1.59"
     assert hass.states.get(e["surcharge"]).state == "15.9"
     assert hass.states.get("sensor.clever_energitillaeg_preliminary_rate") is None
@@ -376,3 +380,83 @@ async def test_several_energy_sensors_each_get_a_surcharge(hass, dk_time, http):
         hass.states.get("sensor.clever_energitillaeg_foreloebigt_energitillaeg_bil_to").state
         == "79.5"
     )
+
+
+def two_months():
+    return month_records("2026-10") + month_records("2026-11")
+
+
+async def test_daily_series_and_last_month(hass, dk_time, http):
+    energy(hass, "189.574")
+    hass.states.async_set(
+        ENERGY,
+        "189.574",
+        {
+            "unit_of_measurement": "kWh",
+            "device_class": "energy",
+            "state_class": "total_increasing",
+            "last_reset": "2026-10-31T23:00:00+00:00",
+            "last_period": "264.206",
+        },
+    )
+    await setup(hass, http, two_months(), energy_entity=ENERGY)
+    e = ids(hass)
+    rate = hass.states.get(e["rate"])
+    assert rate.attributes["state_class"] == "measurement"
+    days = rate.attributes["dage"]
+    assert [d["dato"] for d in days] == [f"2026-11-{n:02d}" for n in range(1, 8)]
+    assert days[0]["dagsgennemsnit"] == days[0]["maanedsgennemsnit"]
+    assert (
+        days[-1]["maanedsgennemsnit"] == rate.attributes["sats_raa"] + 0.89
+        or abs(days[-1]["maanedsgennemsnit"] - (rate.attributes["sats_raa"] + 0.89)) < 2e-4
+    )
+    assert days[-1]["sats"] == 1.59
+    last = hass.states.get(e["last_month_rate"])
+    assert last.state == "0.62" and last.attributes["maaned"] == "2026-10"
+    assert len(last.attributes["dage"]) == 31 and last.attributes["dage"][-1]["sats"] == 0.62
+    assert last.attributes["landsgennemsnit"] == 1.5064
+    lm = hass.states.get(e[f"last_month_surcharge_{ENERGY}"])
+    assert lm.state == str(round(0.62 * 264.206, 2)) and lm.attributes["maaned"] == "2026-10"
+    # Current-month values are unaffected by October being in the response.
+    assert rate.state == "1.59" and rate.attributes["antal_dage_indgaar"] == 7
+
+
+@pytest.mark.parametrize(
+    "attrs",
+    [
+        {"last_reset": "2026-10-31T23:00:00+00:00"},  # no last_period
+        {
+            "last_reset": "2026-09-30T22:00:00+00:00",
+            "last_period": "10",
+        },  # last_period not last month
+        {"last_reset": "2026-10-31T23:00:00+00:00", "last_period": "x"},
+    ],
+)
+async def test_last_month_surcharge_needs_last_period_of_last_month(hass, dk_time, http, attrs):
+    hass.states.async_set(ENERGY, "5", {"unit_of_measurement": "kWh", **attrs})
+    await setup(hass, http, two_months(), energy_entity=ENERGY)
+    assert hass.states.get(ids(hass)[f"last_month_surcharge_{ENERGY}"]).state == "unavailable"
+
+
+async def test_last_month_without_data_is_unknown(hass, dk_time, http):
+    await setup(hass, http, month_records("2026-11"))
+    assert hass.states.get(ids(hass)["last_month_rate"]).state == "unknown"
+
+
+async def test_last_month_rolls_over_and_survives_failed_fetch(hass, freezer, http):
+    await hass.config.async_set_time_zone("Europe/Copenhagen")
+    freezer.move_to(local(2026, 10, 31, 9, 0))
+    await setup(hass, http, month_records("2026-09") + month_records("2026-10"))
+    e = ids(hass)
+    assert hass.states.get(e["last_month_rate"]).state == "0.44"
+    await at(hass, freezer, local(2026, 10, 31, 23, 0))  # daily fetches of 31 Oct done
+    assert hass.states.get(e["last_month_rate"]).state == "0.44"
+    # 1 Nov: before the 00:05 fetch October is not yet "last month" in the data -> unknown, never
+    # September shown as last month.
+    await at(hass, freezer, local(2026, 11, 1, 0, 0))
+    assert hass.states.get(e["last_month_rate"]).state == "unknown"
+    http.respond({"statusCode": 503}, status=503)
+    await at(hass, freezer, local(2026, 11, 1, 0, 5))
+    last = hass.states.get(e["last_month_rate"])
+    assert last.state == "0.62" and last.attributes["maaned"] == "2026-10"
+    assert hass.states.get(e["rate"]).state == "unknown"

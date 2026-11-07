@@ -19,11 +19,11 @@ class PriceApiError(Exception):
         self.status = status
 
 
-def month_query(month: str, next_month: str) -> dict[str, str]:
-    """Query for one Danish calendar month; end is exclusive."""
+def month_query(first_month: str, end_month: str) -> dict[str, str]:
+    """Query from the 1st of first_month to the 1st of end_month (exclusive), Danish time."""
     return {
-        "start": f"{month}-01T00:00",
-        "end": f"{next_month}-01T00:00",
+        "start": f"{first_month}-01T00:00",
+        "end": f"{end_month}-01T00:00",
         "filter": json.dumps({"PriceArea": list(PRICE_AREAS)}, separators=(",", ":")),
         "columns": "TimeDK,PriceArea,DayAheadPriceDKK",
         "sort": "TimeUTC asc",
@@ -44,9 +44,9 @@ class EnergiDataServiceApi:
             text = await resp.text()
             return resp.status, text
 
-    async def async_month_records(self, month: str, next_month: str) -> list[dict[str, Any]]:
-        """Return the month's records; one retry after HTTP 429."""
-        params = month_query(month, next_month)
+    async def async_month_records(self, first_month: str, end_month: str) -> list[dict[str, Any]]:
+        """Records for whole months (one request); one retry after HTTP 429."""
+        params = month_query(first_month, end_month)
         try:
             status, text = await self._get(params)
             if status == 429:

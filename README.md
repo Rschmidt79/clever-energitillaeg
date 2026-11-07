@@ -21,11 +21,144 @@ Metoden giver **præcis Clevers offentliggjorte satser** for alle 13 afsluttede 
 
 | Entitet | Enhed | Bemærkning |
 |---|---|---|
-| `sensor.clever_energitillaeg_foreloebig_sats` | kr./kWh | Attributter: `maaned`, `status` (ok/fejl/ingen_data), `dage_indgaar`, `manglende_dage`, `afventer_dage`, `hentet`, `sats_raa`, `note` … |
+| `sensor.clever_energitillaeg_foreloebig_sats` | kr./kWh | Attributter: `maaned`, `status` (ok/fejl/ingen_data), `dage_indgaar`, `manglende_dage`, `afventer_dage`, `hentet`, `sats_raa`, `dage` (dag for dag), `note` … |
 | `sensor.clever_energitillaeg_landsgennemsnit` | kr./kWh | Inkl. moms |
 | `sensor.clever_energitillaeg_gennemsnit_dk1` / `_dk2` | kr./kWh | Inkl. moms |
 | `sensor.clever_energitillaeg_seneste_hentning` | tidspunkt | Diagnostik |
 | `sensor.clever_energitillaeg_foreloebigt_energitillaeg_<sensor>` | kr. | Én pr. valgt energisensor, opkaldt efter den (fx to biler eller to ladebokse) |
+| `sensor.clever_energitillaeg_sats_sidste_maaned` | kr./kWh | Sidste måneds sats, beregnet ud fra hele måneden; med `landsgennemsnit`, `dage` m.m. |
+| `sensor.clever_energitillaeg_energitillaeg_sidste_maaned_<sensor>` | kr. | Sidste måneds sats × energisensorens `last_period` (kræver en utility meter) |
+
+Sats og gennemsnit gemmes som langtidsstatistik, så HA's historik og statistikgrafer kan vise dem måned efter måned.
+
+### Dag for dag
+
+Attributten `dage` indeholder én post pr. dag, der indgår:
+
+```yaml
+- dato: "2026-11-01"
+  dagsgennemsnit: 2.3912      # dagens spotpris inkl. moms, DK1/DK2 50/50
+  maanedsgennemsnit: 2.3912   # måned-til-dato efter dagen
+  sats: 1.50                  # energitillægssats efter dagen
+```
+
+Med [ApexCharts Card](https://github.com/RomRider/apexcharts-card) (HACS → Frontend) kan du tegne den samme graf som på Clevers side: søjler for hver dag, linjer for månedens gennemsnit og satsen og en vandret linje ved 0,89. Kortet til sidste måned bruger `sensor.clever_energitillaeg_sats_sidste_maaned` og `offset: -31d`.
+
+```yaml
+- type: custom:apexcharts-card
+  header:
+    show: true
+    title: Clever energitillæg · denne måned
+    show_states: false
+  graph_span: 31d
+  span:
+    start: month
+  update_interval: 1h
+  yaxis:
+  - min: 0
+    decimals: 2
+  all_series_config:
+    show:
+      in_header: false
+      legend_value: false
+  apex_config:
+    legend:
+      show: true
+    tooltip:
+      shared: true
+      x:
+        format: d. MMM
+    xaxis:
+      labels:
+        datetimeUTC: false
+        format: d
+  series:
+  - entity: sensor.clever_energitillaeg_foreloebig_sats
+    name: Gns. spotpris inkl. moms (dag)
+    type: column
+    color: '#7dd3dc'
+    data_generator: return (entity.attributes.dage || []).map(d => [new Date(d.dato + "T12:00:00").getTime(), d.dagsgennemsnit]);
+  - entity: sensor.clever_energitillaeg_foreloebig_sats
+    name: Gns. spotpris måned
+    type: line
+    color: '#c3c24a'
+    stroke_width: 2
+    data_generator: return (entity.attributes.dage || []).map(d => [new Date(d.dato + "T12:00:00").getTime(), d.maanedsgennemsnit]);
+  - entity: sensor.clever_energitillaeg_foreloebig_sats
+    name: Energitillægssats
+    type: line
+    color: '#a033b0'
+    stroke_width: 2
+    data_generator: return (entity.attributes.dage || []).map(d => [new Date(d.dato + "T12:00:00").getTime(), d.sats]);
+  - entity: sensor.clever_energitillaeg_foreloebig_sats
+    name: Grundsats
+    type: line
+    color: '#9e9e9e'
+    stroke_width: 1
+    data_generator: 'const m = (entity.attributes.maaned || "").split("-").map(Number); if (!m[0]) return [];
+
+      const n = new Date(m[0], m[1], 0).getDate(); const g = entity.attributes.grundsats || 0.89;
+
+      return Array.from({length: n}, (_, i) => [new Date(m[0], m[1] - 1, i + 1, 12).getTime(), g]);'
+- type: custom:apexcharts-card
+  header:
+    show: true
+    title: Clever energitillæg · sidste måned
+    show_states: false
+  graph_span: 31d
+  span:
+    start: month
+    offset: -31d
+  update_interval: 1h
+  yaxis:
+  - min: 0
+    decimals: 2
+  all_series_config:
+    show:
+      in_header: false
+      legend_value: false
+  apex_config:
+    legend:
+      show: true
+    tooltip:
+      shared: true
+      x:
+        format: d. MMM
+    xaxis:
+      labels:
+        datetimeUTC: false
+        format: d
+  series:
+  - entity: sensor.clever_energitillaeg_sats_sidste_maaned
+    name: Gns. spotpris inkl. moms (dag)
+    type: column
+    color: '#7dd3dc'
+    data_generator: return (entity.attributes.dage || []).map(d => [new Date(d.dato + "T12:00:00").getTime(), d.dagsgennemsnit]);
+  - entity: sensor.clever_energitillaeg_sats_sidste_maaned
+    name: Gns. spotpris måned
+    type: line
+    color: '#c3c24a'
+    stroke_width: 2
+    data_generator: return (entity.attributes.dage || []).map(d => [new Date(d.dato + "T12:00:00").getTime(), d.maanedsgennemsnit]);
+  - entity: sensor.clever_energitillaeg_sats_sidste_maaned
+    name: Energitillægssats
+    type: line
+    color: '#a033b0'
+    stroke_width: 2
+    data_generator: return (entity.attributes.dage || []).map(d => [new Date(d.dato + "T12:00:00").getTime(), d.sats]);
+  - entity: sensor.clever_energitillaeg_sats_sidste_maaned
+    name: Grundsats
+    type: line
+    color: '#9e9e9e'
+    stroke_width: 1
+    data_generator: 'const m = (entity.attributes.maaned || "").split("-").map(Number); if (!m[0]) return [];
+
+      const n = new Date(m[0], m[1], 0).getDate(); const g = entity.attributes.grundsats || 0.89;
+
+      return Array.from({length: n}, (_, i) => [new Date(m[0], m[1] - 1, i + 1, 12).getTime(), g]);'
+```
+
+Uden ApexCharts kan du bruge et almindeligt historik- eller statistikkort med `sensor.clever_energitillaeg_foreloebig_sats` og `sensor.clever_energitillaeg_landsgennemsnit`. Det viser, hvordan satsen har udviklet sig fra dag til dag.
 
 ### Regler
 

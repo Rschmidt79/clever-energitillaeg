@@ -28,6 +28,8 @@ class MonthResult:
     raw_rate: float | None = None
     rate: float | None = None
     includes_future_days: bool = False
+    # Per included day: the day's national average, month-to-date average and rate after that day.
+    days: list[dict[str, Any]] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -39,6 +41,11 @@ class MonthResult:
 
 def month_of(moment: datetime) -> str:
     return moment.astimezone(DK_TZ).strftime("%Y-%m")
+
+
+def previous_month(month: str) -> str:
+    year, mon = map(int, month.split("-"))
+    return f"{year - (mon == 1)}-{(mon - 2) % 12 + 1:02d}"
 
 
 def next_month(month: str) -> str:
@@ -77,6 +84,7 @@ def calculate(
 
     result = MonthResult(month=month, days_in_month=dim)
     totals = {area: [0, 0.0] for area in PRICE_AREAS}
+    factor = (1 + vat_percent / 100) / 1000  # DKK/MWh -> kr./kWh incl. VAT
     for dom in range(1, dim + 1):
         day = date(year, mon, dom)
         key = day.isoformat()
@@ -87,6 +95,16 @@ def calculate(
             for area, c in zip(PRICE_AREAS, counts, strict=True):
                 totals[area][0] += c[0]
                 totals[area][1] += c[1]
+            day_avg = sum(c[1] / c[0] for c in counts) / len(counts) * factor
+            to_date = sum(t[1] / t[0] for t in totals.values()) / len(totals) * factor
+            result.days.append(
+                {
+                    "dato": key,
+                    "dagsgennemsnit": round(day_avg, 4),
+                    "maanedsgennemsnit": round(to_date, 4),
+                    "sats": round(max(0.0, to_date - threshold), 2),
+                }
+            )
         elif day <= today:
             result.missing_days.append(key)
         else:
@@ -95,7 +113,6 @@ def calculate(
     result.intervals = {area: totals[area][0] for area in PRICE_AREAS}
     if not result.included_days:
         return result
-    factor = (1 + vat_percent / 100) / 1000  # DKK/MWh -> kr./kWh incl. VAT
     avg = {area: totals[area][1] / totals[area][0] * factor for area in PRICE_AREAS}
     national = sum(avg.values()) / len(avg)
     raw = national - threshold

@@ -31,6 +31,14 @@ def surcharge_object_id(energy_entity: str) -> str:
     return f"{SURCHARGE_OBJECT_ID}_{energy_entity.split('.', 1)[-1]}"
 
 
+def last_month_surcharge_key(energy_entity: str) -> str:
+    return f"last_month_surcharge_{energy_entity}"
+
+
+def last_month_surcharge_object_id(energy_entity: str) -> str:
+    return f"energitillaeg_sidste_maaned_{energy_entity.split('.', 1)[-1]}"
+
+
 async def async_migrate_entry(hass: HomeAssistant, entry: CleverConfigEntry) -> bool:
     """1 -> 2: one energy sensor becomes a list; its surcharge entity keeps its history."""
     if entry.version > 2:
@@ -57,7 +65,7 @@ def _migrate_entity_ids(hass: HomeAssistant, entry: CleverConfigEntry) -> None:
     registry = er.async_get(hass)
     for ent in er.async_entries_for_config_entry(registry, entry.entry_id):
         key = ent.unique_id.removeprefix(f"{entry.entry_id}_")
-        if key in OBJECT_IDS:
+        if key in OBJECT_IDS and key in OLD_OBJECT_IDS:
             old = f"sensor.{DOMAIN}_{OLD_OBJECT_IDS[key]}"
             new = f"sensor.{DOMAIN}_{OBJECT_IDS[key]}"
         elif key.startswith("surcharge_"):

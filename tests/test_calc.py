@@ -102,3 +102,42 @@ def test_other_month_and_area_ignored_and_options_used():
     no_vat = calculate(recs, "2026-10", date(2026, 10, 31), 0.89, 0)
     assert no_vat.national_average == pytest.approx(base.national_average / 1.25, abs=1e-4)
     assert calculate(month_records("2026-11"), "2026-10", date(2026, 10, 31), 0.89, 25).rate is None
+
+
+def test_daily_series_matches_reference_and_dst():
+    recs = month_records("2026-10")
+    res = calculate(recs, "2026-10", date(2026, 10, 31), 0.89, 25)
+    assert len(res.days) == 31
+    dst = next(d for d in res.days if d["dato"] == "2026-10-25")
+    ref = [
+        fmean(
+            r["DayAheadPriceDKK"]
+            for r in recs
+            if r["PriceArea"] == a and r["TimeDK"][:10] == "2026-10-25"
+        )
+        * 1.25
+        / 1000
+        for a in ("DK1", "DK2")
+    ]
+    assert dst["dagsgennemsnit"] == pytest.approx(sum(ref) / 2, abs=6e-5)
+    assert res.days[-1]["maanedsgennemsnit"] == res.national_average
+    assert res.days[-1]["sats"] == res.rate == 0.62
+
+
+def test_daily_series_skips_missing_day():
+    recs = [r for r in month_records("2026-11") if r["TimeDK"][:10] != "2026-11-03"]
+    res = calculate(recs, "2026-11", date(2026, 11, 6), 0.89, 25)
+    assert [d["dato"] for d in res.days] == [
+        "2026-11-01",
+        "2026-11-02",
+        "2026-11-04",
+        "2026-11-05",
+        "2026-11-06",
+        "2026-11-07",
+    ]
+
+
+def test_previous_month():
+    from custom_components.clever_energitillaeg.calc import previous_month
+
+    assert previous_month("2026-01") == "2025-12" and previous_month("2026-11") == "2026-10"

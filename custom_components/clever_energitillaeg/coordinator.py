@@ -15,7 +15,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .api import EnergiDataServiceApi, PriceApiError
-from .calc import MonthResult, calculate, month_of, next_month
+from .calc import MonthResult, calculate, month_of, next_month, previous_month
 from .const import (
     CONF_THRESHOLD,
     CONF_VAT,
@@ -43,6 +43,7 @@ class CleverData:
     last_attempt: datetime
     error: str | None = None
     http_status: int | None = None
+    previous: MonthResult | None = None  # last month, recalculated from source data
 
 
 def option(entry: ConfigEntry, key: str, default: Any) -> Any:
@@ -70,12 +71,14 @@ class CleverCoordinator(DataUpdateCoordinator[CleverData]):
         if not raw or raw.get("threshold") != self.threshold or raw.get("vat") != self.vat:
             return
         try:
+            prev = raw.get("previous")
             self._stored = CleverData(
                 month=raw["month"],
                 status="ok",
                 result=MonthResult.from_dict(raw["result"]),
                 fetched=dt_util.parse_datetime(raw["fetched"]),
                 last_attempt=dt_util.parse_datetime(raw["fetched"]),
+                previous=MonthResult.from_dict(prev) if prev else None,
             )
         except KeyError, TypeError, ValueError:
             _LOGGER.debug("Ignoring unreadable stored calculation")
@@ -86,11 +89,24 @@ class CleverCoordinator(DataUpdateCoordinator[CleverData]):
                 return candidate
         return None
 
+    def _last_month_result(self, last_month: str) -> MonthResult | None:
+        """Last month from an earlier calculation, used only when a fetch fails."""
+        for candidate in (self.data, self._stored):
+            if candidate is None:
+                continue
+            if candidate.month == last_month and candidate.result is not None:
+                return candidate.result
+            if candidate.previous is not None and candidate.previous.month == last_month:
+                return candidate.previous
+        return None
+
     async def _async_update_data(self) -> CleverData:
         now = dt_util.now()
         month = month_of(now)
+        last_month = previous_month(month)
         try:
-            records = await self.api.async_month_records(month, next_month(month))
+            # Last month and this month in one request (Energinet rate-limits to ~1 call/minute).
+            records = await self.api.async_month_records(last_month, next_month(month))
         except PriceApiError as err:
             _LOGGER.warning("Energinet DayAheadPrices: %s", err)
             prev = self._previous(month)
@@ -106,8 +122,13 @@ class CleverCoordinator(DataUpdateCoordinator[CleverData]):
                 last_attempt=now,
                 error=str(err),
                 http_status=err.status,
+                previous=self._last_month_result(last_month),
             )
-        result = calculate(records, month, now.astimezone(DK_TZ).date(), self.threshold, self.vat)
+        today = now.astimezone(DK_TZ).date()
+        result = calculate(records, month, today, self.threshold, self.vat)
+        previous = calculate(records, last_month, today, self.threshold, self.vat)
+        if not previous.included_days:
+            previous = None
         if not result.included_days:
             return CleverData(
                 month=month,
@@ -117,18 +138,26 @@ class CleverCoordinator(DataUpdateCoordinator[CleverData]):
                 last_attempt=now,
                 error="Ingen komplette dage",
                 http_status=200,
+                previous=previous,
             )
         await self._store.async_save(
             {
                 "month": month,
                 "result": result.as_dict(),
+                "previous": previous.as_dict() if previous else None,
                 "fetched": now.isoformat(),
                 "threshold": self.threshold,
                 "vat": self.vat,
             }
         )
         return CleverData(
-            month=month, status="ok", result=result, fetched=now, last_attempt=now, http_status=200
+            month=month,
+            status="ok",
+            result=result,
+            fetched=now,
+            last_attempt=now,
+            http_status=200,
+            previous=previous,
         )
 
     @callback

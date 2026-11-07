@@ -35,6 +35,7 @@ OBJECT_IDS = {
     "average_dk1": "gennemsnit_dk1",
     "average_dk2": "gennemsnit_dk2",
     "last_fetch": "seneste_hentning",
+    "last_month_rate": "sats_sidste_maaned",
 }
 SURCHARGE_OBJECT_ID = "foreloebigt_energitillaeg"  # + "_" + the energy sensor's object id
 

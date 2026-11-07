@@ -1,5 +1,13 @@
 # Ændringer
 
+## 0.3.0 – 2026-11-07
+
+- Dag for dag: attributten `dage` (dagsgennemsnit, måned-til-dato og sats efter hver dag) til grafer som Clevers.
+- Ny sensor `sats_sidste_maaned` (beregnet for hele sidste måned) og `energitillaeg_sidste_maaned_<sensor>` (ud fra utility meterens `last_period`).
+- Sidste og indeværende måned hentes i ét kald til Energinet.
+- Sats og gennemsnit har `state_class: measurement`, så HA gemmer langtidsstatistik.
+- README: ApexCharts-eksempel.
+
 ## 0.2.0 – 2026-11-06
 
 - Flere energisensorer: hver valgt sensor får sit eget foreløbige energitillæg (`sensor.clever_energitillaeg_foreloebigt_energitillaeg_<sensor>`), opkaldt efter sensoren. Fravalgte sensorers tillæg fjernes.

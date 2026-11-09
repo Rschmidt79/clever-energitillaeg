@@ -43,7 +43,11 @@ med Clever = månedens sats × kWh            (kun energitillægget, ingen kWh-p
 besparelse = betalt − med Clever            (positiv: Clever havde været billigst)
 ```
 
-Abonnementet er ikke medregnet, fordi det betales uanset. Tilføj hver ladning:
+Abonnementet er ikke medregnet, fordi det betales uanset.
+
+**Formular på dashboardet (følger med integrationen):** `date.clever_energitillaeg_dc_dato`, `number.clever_energitillaeg_dc_kwh`, `number.clever_energitillaeg_dc_pris`, `text.clever_energitillaeg_dc_note` og knapperne `button.clever_energitillaeg_tilfoej_dc_ladning` og `button.clever_energitillaeg_fortryd_seneste_dc_ladning`. Udfyld felterne og tryk *Tilføj DC-ladning*. Derefter nulstilles kWh, pris og note, mens datoen bliver stående til næste kvittering. Pris 0 betyder "ingen kvittering", når en alternativ pris er sat (se nedenfor). Ellers betyder det en gratis ladning. Du skal ikke selv oprette hjælpere eller scripts. Se kort-eksemplet under *Med eller uden Clever?*.
+
+Ladninger kan også tilføjes med handlingen, fx fra en automation:
 
 ```yaml
 action: clever_energitillaeg.tilfoej_offentlig_ladning
@@ -86,6 +90,51 @@ Under *Konfigurér*:
 - **Alternativ pris for offentlig ladning (kr./kWh):** til dig, der *har* Clever og vil vide, hvad det havde kostet uden. Tilføj ladninger på Clevers net uden `pris`. Uden Clever regnes de som kWh × den alternative pris, fx Tesla- eller Ionity-prisen. Ladninger med `pris` (en kvittering) bruger altid kvitteringens beløb.
 
 Er der valgt energisensorer, men ingen hjemmepris, eller en ladning uden pris og ingen alternativ pris, er `uden_clever` og `forskel_med_clever` `unavailable` (attribut `mangler`).
+
+#### Kort-eksempel
+
+Et almindeligt entitetskort, der ikke kræver ekstra frontend-kort:
+
+```yaml
+- type: entities
+  title: Med eller uden Clever
+  entities:
+    - entity: sensor.clever_energitillaeg_med_clever
+    - entity: sensor.clever_energitillaeg_uden_clever
+    - entity: sensor.clever_energitillaeg_forskel_med_clever
+    - type: attribute
+      entity: sensor.clever_energitillaeg_forskel_med_clever
+      attribute: billigst
+      name: Billigst
+    - type: section
+      label: Sidste måned
+    - entity: sensor.clever_energitillaeg_med_clever_sidste_maaned
+    - entity: sensor.clever_energitillaeg_uden_clever_sidste_maaned
+    - entity: sensor.clever_energitillaeg_forskel_med_clever_sidste_maaned
+- type: entities
+  title: Offentlig ladning (DC)
+  entities:
+    - entity: sensor.clever_energitillaeg_offentlig_ladning
+    - entity: sensor.clever_energitillaeg_offentlig_ladning_betalt
+    - entity: sensor.clever_energitillaeg_foreloebigt_energitillaeg_offentlig_ladning
+      name: Med Clever (energitillæg)
+    - entity: sensor.clever_energitillaeg_offentlig_ladning_besparelse_med_clever
+- type: entities
+  title: Tilføj DC-ladning
+  entities:
+    - entity: date.clever_energitillaeg_dc_dato
+    - entity: number.clever_energitillaeg_dc_kwh
+    - entity: number.clever_energitillaeg_dc_pris
+    - entity: text.clever_energitillaeg_dc_note
+    - entity: button.clever_energitillaeg_tilfoej_dc_ladning
+    - entity: button.clever_energitillaeg_fortryd_seneste_dc_ladning
+- type: markdown
+  title: Månedens ladninger
+  content: >-
+    {% for c in state_attr('sensor.clever_energitillaeg_offentlig_ladning', 'ladninger') or [] %}
+    - {{ c.dato }}: {{ c.kwh }} kWh, {{ c.pris if c.pris is not none else '–' }} kr. {{ c.note or '' }}
+    {% else %}Ingen ladninger denne måned.{% endfor %}
+```
 
 ### Dag for dag
 
@@ -269,12 +318,19 @@ Uden ApexCharts kan du bruge et almindeligt historik- eller statistikkort med `s
 2. **Indstillinger → Enheder og tjenester → Tilføj integration → "Clever energitillæg".**
 3. Vælg eventuelt en eller flere **månedlige energisensorer** i kWh, fx én pr. bil eller ladeboks. Hver får sit eget foreløbige energitillæg. Sensorerne skal nulstilles den 1. i måneden og have `last_reset`. Det har en utility meter:
 
+   Lav den i brugerfladen: **Indstillinger → Enheder og tjenester → Hjælpere → Opret hjælper → Forsyningsmåler** (utility meter). Vælg din laders samlede kWh-sensor som kilde og *Månedlig* som nulstillingscyklus. Eller i YAML:
+
    ```yaml
    utility_meter:
      ladeboks_denne_maaned:
        source: sensor.min_ladeboks_energi   # samlet kWh fra din lader
        cycle: monthly
    ```
+
+4. Til sammenligningen **med eller uden Clever**: sæt *Clever-abonnement* (standard 849 kr./md.) og hjemmeladningens pris under *Konfigurér*. Der er to muligheder:
+   - **En sensor med hvad hjemmeladningen koster i kr. denne måned.** Har du en sensor, der summerer ladeprisen i kr. (fx effekt × elpris integreret over tid), så lav en *månedlig* forsyningsmåler over den på samme måde som ovenfor og vælg måleren. Enheden skal være `kr`, `kr.` eller `DKK`.
+   - **Eller en fast pris pr. kWh.** Den ganges med månedens kWh fra energisensorerne. Det er den nemmeste løsning, hvis du ikke har en prissensor.
+   - Har du Clever, så sæt også *Alternativ pris for offentlig ladning*, så ladninger uden kvittering kan regnes "uden Clever".
 
    Grundsats (0,89) og moms (25 %) kan ændres under *Konfigurér*.
 

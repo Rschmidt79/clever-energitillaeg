@@ -55,6 +55,12 @@ OBJECT_IDS = {
     "comparison_without_last_month": "uden_clever_sidste_maaned",
     "comparison_difference": "forskel_med_clever",
     "comparison_difference_last_month": "forskel_med_clever_sidste_maaned",
+    "form_date": "dc_dato",
+    "form_kwh": "dc_kwh",
+    "form_price": "dc_pris",
+    "form_note": "dc_note",
+    "form_add": "tilfoej_dc_ladning",
+    "form_undo": "fortryd_seneste_dc_ladning",
     "total_surcharge": "foreloebigt_energitillaeg_i_alt",
     "total_last_month_surcharge": "energitillaeg_sidste_maaned_i_alt",
 }

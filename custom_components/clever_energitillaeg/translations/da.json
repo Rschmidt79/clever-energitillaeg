@@ -119,6 +119,32 @@
       "comparison_difference_last_month": {
         "name": "Forskel med Clever sidste måned"
       }
+    },
+    "date": {
+      "form_date": {
+        "name": "DC-ladning dato"
+      }
+    },
+    "number": {
+      "form_kwh": {
+        "name": "DC-ladning kWh"
+      },
+      "form_price": {
+        "name": "DC-ladning pris"
+      }
+    },
+    "text": {
+      "form_note": {
+        "name": "DC-ladning note"
+      }
+    },
+    "button": {
+      "form_add": {
+        "name": "Tilføj DC-ladning"
+      },
+      "form_undo": {
+        "name": "Fortryd seneste DC-ladning"
+      }
     }
   },
   "services": {
@@ -164,6 +190,9 @@
     },
     "not_found": {
       "message": "Ladningen findes ikke."
+    },
+    "form_no_kwh": {
+      "message": "Skriv antal kWh, før du tilføjer ladningen."
     }
   }
 }

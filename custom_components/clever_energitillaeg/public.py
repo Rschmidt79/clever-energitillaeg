@@ -39,6 +39,16 @@ class PublicCharge:
         return date.fromisoformat(self.dato).strftime("%Y-%m")
 
 
+@dataclass
+class ChargeForm:
+    """Values typed into the dashboard form before "Tilføj DC-ladning" is pressed."""
+
+    dato: date | None = None  # None: today
+    kwh: float = 0.0
+    pris: float = 0.0
+    note: str = ""
+
+
 class PublicCharging:
     """Charges entered by the user, persisted per config entry."""
 
@@ -47,7 +57,9 @@ class PublicCharging:
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}.offentlig_ladning"
         )
         self.charges: list[PublicCharge] = []
+        self.form = ChargeForm()
         self._listeners: list[Callable[[], None]] = []
+        self._form_listeners: list[Callable[[], None]] = []
 
     async def async_load(self) -> None:
         raw = await self._store.async_load() or {}
@@ -71,6 +83,16 @@ class PublicCharging:
     def async_add_listener(self, listener: Callable[[], None]) -> CALLBACK_TYPE:
         self._listeners.append(listener)
         return lambda: self._listeners.remove(listener)
+
+    @callback
+    def async_add_form_listener(self, listener: Callable[[], None]) -> CALLBACK_TYPE:
+        self._form_listeners.append(listener)
+        return lambda: self._form_listeners.remove(listener)
+
+    @callback
+    def async_form_changed(self) -> None:
+        for listener in list(self._form_listeners):
+            listener()
 
     async def _async_changed(self) -> None:
         await self._store.async_save({"ladninger": [asdict(c) for c in self.charges]})

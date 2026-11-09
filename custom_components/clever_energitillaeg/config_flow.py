@@ -18,8 +18,12 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CONF_ENERGY_ENTITIES,
+    CONF_HOME_COST_ENTITY,
+    CONF_HOME_PRICE,
+    CONF_SUBSCRIPTION,
     CONF_THRESHOLD,
     CONF_VAT,
+    DEFAULT_SUBSCRIPTION,
     DEFAULT_THRESHOLD,
     DEFAULT_VAT,
     DOMAIN,
@@ -41,6 +45,21 @@ SCHEMA = vol.Schema(
         vol.Required(CONF_VAT, default=DEFAULT_VAT): NumberSelector(
             NumberSelectorConfig(
                 min=0, max=100, step=0.1, mode=NumberSelectorMode.BOX, unit_of_measurement="%"
+            )
+        ),
+        vol.Required(CONF_SUBSCRIPTION, default=DEFAULT_SUBSCRIPTION): NumberSelector(
+            NumberSelectorConfig(
+                min=0, max=10000, step=1, mode=NumberSelectorMode.BOX, unit_of_measurement="kr./md."
+            )
+        ),
+        vol.Optional(CONF_HOME_COST_ENTITY): EntitySelector(EntitySelectorConfig(domain="sensor")),
+        vol.Optional(CONF_HOME_PRICE): NumberSelector(
+            NumberSelectorConfig(
+                min=0,
+                max=20,
+                step=0.001,
+                mode=NumberSelectorMode.BOX,
+                unit_of_measurement="kr./kWh",
             )
         ),
     }

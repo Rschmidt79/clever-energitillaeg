@@ -67,6 +67,24 @@ Indeværende måneds sats er foreløbig, så "med Clever" og besparelsen ændrer
 
 `..._i_alt` er sats × (månedens kWh fra alle valgte energisensorer + offentlig ladning), altså hele dit energitillæg med Clever. Den er `unavailable`, hvis en af energisensorerne ikke kan bruges, så en del aldrig tæller som 0.
 
+### Med eller uden Clever?
+
+Seks sensorer (`med_clever`, `uden_clever`, `forskel_med_clever`, også `_sidste_maaned`) viser, hvad måneden havde kostet med Clever (Clever One med Clever Power, hvor hjemmeladningens strøm dækkes 1:1) og uden:
+
+```
+med Clever  = abonnement + sats × (hjemme-kWh + offentlig kWh)
+uden Clever = hjemmeladningens pris + det du har betalt for offentlig ladning
+forskel     = uden − med            (positiv: Clever havde været billigst; attribut billigst)
+```
+
+Under *Konfigurér*:
+
+- **Clever-abonnement:** standard 849 kr./md. (Clever One med ladeboks, clever.dk november 2026). Installation af ladeboks (engangsbeløb) er ikke med.
+- **Hjemmeladningens pris pr. måned:** en sensor i kr. (`kr`, `kr.` eller `DKK`), der nulstilles den 1. og har `last_reset`, fx en utility meter med `cycle: monthly` over din ladeprissensor. Sidste måned bruger dens `last_period`.
+- **Eller hjemmeladningens pris pr. kWh:** fast pris × månedens kWh fra energisensorerne.
+
+Er der valgt energisensorer, men ingen hjemmepris, er `uden_clever` og `forskel_med_clever` `unavailable` (attribut `mangler`).
+
 ### Dag for dag
 
 Attributten `dage` indeholder én post pr. dag, der indgår:

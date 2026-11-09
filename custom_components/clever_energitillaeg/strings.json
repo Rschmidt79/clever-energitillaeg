@@ -7,12 +7,18 @@
         "data": {
           "threshold": "Grundsats",
           "vat_percent": "Moms",
-          "energy_entities": "Månedlige energisensorer (valgfri)"
+          "energy_entities": "Månedlige energisensorer (valgfri)",
+          "subscription": "Clever-abonnement",
+          "home_cost_entity": "Hjemmeladningens pris pr. måned (valgfri sensor)",
+          "home_price": "Hjemmeladningens pris pr. kWh (valgfri)"
         },
         "data_description": {
           "threshold": "Clevers grænse inkl. moms; tillægget er den del af gennemsnittet, der ligger over.",
           "vat_percent": "Lægges på spotprisen før sammenligning.",
-          "energy_entities": "Hver sensor får sit eget foreløbige energitillæg. Den skal nulstilles den 1. i måneden og have last_reset (utility meter)."
+          "energy_entities": "Hver sensor får sit eget foreløbige energitillæg. Den skal nulstilles den 1. i måneden og have last_reset (utility meter).",
+          "subscription": "Månedlig pris til sammenligningen med og uden Clever. Clever One med ladeboks: 849 kr./md. (november 2026).",
+          "home_cost_entity": "Hvad hjemmeladningen koster dig i kr. denne måned (fx en utility meter med cycle: monthly). Med Clever Power dækkes den 1:1, så den lægges kun på \"uden Clever\".",
+          "home_price": "Bruges, hvis du ikke vælger en sensor: pris × månedens kWh fra energisensorerne."
         }
       }
     },
@@ -28,7 +34,15 @@
         "data": {
           "threshold": "Grundsats",
           "vat_percent": "Moms",
-          "energy_entities": "Månedlige energisensorer (valgfri)"
+          "energy_entities": "Månedlige energisensorer (valgfri)",
+          "subscription": "Clever-abonnement",
+          "home_cost_entity": "Hjemmeladningens pris pr. måned (valgfri sensor)",
+          "home_price": "Hjemmeladningens pris pr. kWh (valgfri)"
+        },
+        "data_description": {
+          "subscription": "Månedlig pris til sammenligningen med og uden Clever. Clever One med ladeboks: 849 kr./md. (november 2026).",
+          "home_cost_entity": "Hvad hjemmeladningen koster dig i kr. denne måned (fx en utility meter med cycle: monthly). Med Clever Power dækkes den 1:1, så den lægges kun på \"uden Clever\".",
+          "home_price": "Bruges, hvis du ikke vælger en sensor: pris × månedens kWh fra energisensorerne."
         }
       }
     }
@@ -82,6 +96,24 @@
       },
       "public_saving_last_month": {
         "name": "Offentlig ladning besparelse med Clever sidste måned"
+      },
+      "comparison_with": {
+        "name": "Med Clever"
+      },
+      "comparison_with_last_month": {
+        "name": "Med Clever sidste måned"
+      },
+      "comparison_without": {
+        "name": "Uden Clever"
+      },
+      "comparison_without_last_month": {
+        "name": "Uden Clever sidste måned"
+      },
+      "comparison_difference": {
+        "name": "Forskel med Clever"
+      },
+      "comparison_difference_last_month": {
+        "name": "Forskel med Clever sidste måned"
       }
     }
   },

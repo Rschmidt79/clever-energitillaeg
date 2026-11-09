@@ -17,8 +17,12 @@ from homeassistant.util import dt as dt_util
 from .api import EnergiDataServiceApi, PriceApiError
 from .calc import MonthResult, calculate, month_of, next_month, previous_month
 from .const import (
+    CONF_HOME_COST_ENTITY,
+    CONF_HOME_PRICE,
+    CONF_SUBSCRIPTION,
     CONF_THRESHOLD,
     CONF_VAT,
+    DEFAULT_SUBSCRIPTION,
     DEFAULT_THRESHOLD,
     DEFAULT_VAT,
     DK_TZ,
@@ -61,6 +65,10 @@ class CleverCoordinator(DataUpdateCoordinator[CleverData]):
         self.api = api
         self.threshold = float(option(entry, CONF_THRESHOLD, DEFAULT_THRESHOLD))
         self.vat = float(option(entry, CONF_VAT, DEFAULT_VAT))
+        self.subscription = float(option(entry, CONF_SUBSCRIPTION, DEFAULT_SUBSCRIPTION))
+        self.home_cost_entity: str | None = option(entry, CONF_HOME_COST_ENTITY, None) or None
+        home_price = option(entry, CONF_HOME_PRICE, None)
+        self.home_price: float | None = None if home_price is None else float(home_price)
         self._store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}"
         )

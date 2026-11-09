@@ -58,6 +58,10 @@ async def async_setup_entry(
         entities.append(PublicPaidSensor(coordinator, last))
         entities.append(PublicSavingSensor(coordinator, last))
         entities.append(TotalSurchargeSensor(coordinator, energy_entities, last))
+        entities.extend(
+            ComparisonSensor(coordinator, energy_entities, kind, last)
+            for kind in ("with", "without", "difference")
+        )
     # Surcharges for sensors no longer selected are removed, not left as orphans.
     registry = er.async_get(hass)
     wanted = {e.unique_id for e in entities}
@@ -576,9 +580,15 @@ class TotalSurchargeSensor(PublicEntity):
     _attr_suggested_display_precision = 2
 
     def __init__(
-        self, coordinator: CleverCoordinator, energy_entities: list[str], last: bool
+        self,
+        coordinator: CleverCoordinator,
+        energy_entities: list[str],
+        last: bool,
+        key: str | None = None,
     ) -> None:
-        super().__init__(coordinator, "total_last_month_surcharge" if last else "total_surcharge")
+        if key is None:
+            key = "total_last_month_surcharge" if last else "total_surcharge"
+        super().__init__(coordinator, key)
         self._last = last
         self._attr_icon = "mdi:cash-check" if last else "mdi:cash-multiple"
         # Our own public charging sensor, if selected as an energy sensor, is counted once.
@@ -621,6 +631,106 @@ class TotalSurchargeSensor(PublicEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return self._value()[1]
+
+
+COMPARISON_NOTE = (
+    "Med Clever (Clever One + Clever Power) = abonnement + energitillæg (sats × alle kWh hjemme "
+    "og ude); hjemmeladningens strøm dækkes 1:1. Uden Clever = det hjemmeladningen koster dig + "
+    "det du har betalt for offentlig ladning. Forskel = uden − med; positiv: Clever havde været "
+    "billigst. Indeværende måneds sats er foreløbig."
+)
+MONEY_UNITS = ("kr", "kr.", "DKK")
+
+
+def money_value(hass: HomeAssistant, entity_id: str, last: bool) -> tuple[float | None, str | None]:
+    """A monthly cost sensor in kr.: this month's state, or last month's last_period."""
+    state = hass.states.get(entity_id)
+    if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+        return None, "hjemmepris_utilgaengelig"
+    if state.attributes.get("unit_of_measurement") not in MONEY_UNITS:
+        return None, "hjemmepris_enhed"
+    last_reset = dt_util.parse_datetime(str(state.attributes.get("last_reset") or ""))
+    if last_reset is None or month_of(last_reset) != month_of(dt_util.now()):
+        return None, "hjemmepris_ikke_nulstillet_denne_maaned"
+    try:
+        return float(state.attributes["last_period"] if last else state.state), None
+    except KeyError, TypeError, ValueError:
+        return None, "hjemmepris_utilgaengelig"
+
+
+class ComparisonSensor(TotalSurchargeSensor):
+    """The month with Clever vs. without Clever, and the difference."""
+
+    def __init__(
+        self,
+        coordinator: CleverCoordinator,
+        energy_entities: list[str],
+        kind: str,
+        last: bool,
+    ) -> None:
+        key = f"comparison_{kind}" + ("_last_month" if last else "")
+        super().__init__(coordinator, energy_entities, last, key)
+        self._kind = kind
+        self._attr_icon = {
+            "with": "mdi:lightning-bolt-circle",
+            "without": "mdi:receipt-text",
+            "difference": "mdi:scale-balance",
+        }[kind]
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if cost := self.coordinator.home_cost_entity:
+            self.async_on_remove(async_track_state_change_event(self.hass, [cost], self._tick))
+
+    def _home_cost(self, home_kwh: float | None) -> tuple[float | None, str | None]:
+        """What home charging costs without Clever."""
+        coordinator = self.coordinator
+        if coordinator.home_cost_entity:
+            return money_value(self.hass, coordinator.home_cost_entity, self._last)
+        if not self._energy_entities:
+            return 0.0, None  # no home charging is tracked
+        if coordinator.home_price is None:
+            return None, "hjemmepris_mangler"
+        if home_kwh is None:
+            return None, "energi_utilgaengelig"
+        return round(coordinator.home_price * home_kwh, 2), None
+
+    def _comparison(self) -> tuple[float | None, dict[str, Any]]:
+        surcharge, info = TotalSurchargeSensor._value(self)
+        month = self._month(self._last)
+        subscription = self.coordinator.subscription
+        paid = self.coordinator.public.paid(month)
+        parts = info.get("energi_kwh_dele") or {}
+        home_values = [v for k, v in parts.items() if k != "offentlig_ladning"]
+        home_kwh = None if None in home_values else round(sum(home_values), 3)
+        home_cost, reason = self._home_cost(home_kwh)
+        with_clever = None if surcharge is None else round(subscription + surcharge, 2)
+        without = None if home_cost is None else round(home_cost + paid, 2)
+        diff = None if with_clever is None or without is None else round(without - with_clever, 2)
+        attrs: dict[str, Any] = {
+            "maaned": month,
+            "med_clever": with_clever,
+            "uden_clever": without,
+            "forskel": diff,
+            "billigst": None if diff is None else ("Clever" if diff > 0 else "Uden Clever"),
+            "abonnement": subscription,
+            "energitillaeg": surcharge,
+            "sats": info.get("sats"),
+            "energi_kwh": info.get("energi_kwh"),
+            "energi_kwh_dele": parts,
+            "hjemme_kwh": home_kwh,
+            "hjemmeladning_pris": home_cost,
+            "hjemmeladning_kilde": self.coordinator.home_cost_entity
+            or (None if self.coordinator.home_price is None else "fast kr./kWh"),
+            "offentlig_ladning_betalt": paid,
+            "mangler": reason,
+            "note": COMPARISON_NOTE,
+        }
+        value = {"with": with_clever, "without": without, "difference": diff}[self._kind]
+        return value, attrs
+
+    def _value(self) -> tuple[float | None, dict[str, Any]]:
+        return self._comparison()
 
 
 def month_rate(coordinator: CleverCoordinator, month: str) -> float | None:

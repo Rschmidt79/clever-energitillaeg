@@ -209,3 +209,108 @@ async def test_month_change_moves_charges_to_last_month(hass, freezer, http):
     assert state(hass, TOTAL_LAST) == str(round(rate_nov * 120, 2))
     assert state(hass, PAID_LAST) == "540.0" and state(hass, PAID) == "0"
     assert state(hass, SAVING_LAST) == str(round(540 - rate_nov * 120, 2))
+
+
+WITH = "sensor.clever_energitillaeg_med_clever"
+WITHOUT = "sensor.clever_energitillaeg_uden_clever"
+DIFF = "sensor.clever_energitillaeg_forskel_med_clever"
+COST = "sensor.hjemmeladning_pris_maaned"
+
+
+async def test_comparison_this_month_fixed_home_price(hass, dk_time, http):
+    energy(hass, "189.574")
+    await setup(hass, http, month_records("2026-11"), energy_entity=ENERGY, home_price=1.2)
+    await add(hass, kwh=120, pris=540)
+    await hass.async_block_till_done()
+    surcharge = round(1.59 * (189.574 + 120), 2)
+    med = round(849 + surcharge, 2)
+    uden = round(round(1.2 * 189.574, 2) + 540, 2)
+    assert state(hass, WITH) == str(med)
+    assert state(hass, WITHOUT) == str(uden)
+    diff = hass.states.get(DIFF)
+    assert diff.state == str(round(uden - med, 2))
+    a = diff.attributes
+    assert a["billigst"] == "Uden Clever" and a["abonnement"] == 849.0
+    assert a["energitillaeg"] == surcharge and a["offentlig_ladning_betalt"] == 540.0
+    assert a["hjemme_kwh"] == 189.574 and a["hjemmeladning_pris"] == round(1.2 * 189.574, 2)
+    assert a["hjemmeladning_kilde"] == "fast kr./kWh" and a["mangler"] is None
+    assert "Clever Power" in a["note"]
+
+
+async def test_comparison_needs_home_price_when_home_is_tracked(hass, dk_time, http):
+    energy(hass, "189.574")
+    await setup(hass, http, month_records("2026-11"), energy_entity=ENERGY)
+    assert state(hass, WITH) == str(round(849 + round(1.59 * 189.574, 2), 2))
+    assert state(hass, WITHOUT) == "unavailable" and state(hass, DIFF) == "unavailable"
+
+
+async def test_comparison_with_cost_sensor(hass, dk_time, http):
+    energy(hass, "189.574")
+    attrs = {"unit_of_measurement": "kr", "last_reset": "2026-10-31T23:00:00+00:00"}
+    hass.states.async_set(COST, "210.5", attrs)
+    await setup(
+        hass,
+        http,
+        month_records("2026-11"),
+        energy_entity=ENERGY,
+        home_cost_entity=COST,
+        home_price=9.99,  # ignored when a sensor is chosen
+    )
+    await add(hass, kwh=120, pris=540)
+    await hass.async_block_till_done()
+    assert state(hass, WITHOUT) == str(round(210.5 + 540, 2))
+    hass.states.async_set(COST, "300", attrs)
+    await hass.async_block_till_done()
+    assert state(hass, WITHOUT) == "840.0"
+    hass.states.async_set(COST, "300", attrs | {"unit_of_measurement": "kWh"})
+    await hass.async_block_till_done()
+    assert state(hass, WITHOUT) == "unavailable"
+    hass.states.async_set(COST, "300", attrs | {"last_reset": "2026-09-30T22:00:00+00:00"})
+    await hass.async_block_till_done()
+    assert state(hass, WITHOUT) == "unavailable"
+
+
+async def test_comparison_without_home_tracking_custom_subscription(hass, dk_time, http):
+    await setup(hass, http, month_records("2026-11"), subscription=100)
+    await add(hass, kwh=120, pris=900)
+    await hass.async_block_till_done()
+    assert state(hass, WITH) == str(round(100 + 190.8, 2))
+    assert state(hass, WITHOUT) == "900.0"
+    diff = hass.states.get(DIFF)
+    assert diff.state == str(round(900 - 290.8, 2)) and diff.attributes["billigst"] == "Clever"
+
+
+async def test_comparison_unavailable_without_energy(hass, dk_time, http):
+    energy(hass, "unavailable")
+    await setup(hass, http, month_records("2026-11"), energy_entity=ENERGY, home_price=1.2)
+    assert state(hass, WITH) == "unavailable" and state(hass, DIFF) == "unavailable"
+    assert state(hass, WITHOUT) == "unavailable"
+
+
+async def test_comparison_last_month(hass, dk_time, http):
+    hass.states.async_set(
+        ENERGY,
+        "189.574",
+        {
+            "unit_of_measurement": "kWh",
+            "last_reset": "2026-10-31T23:00:00+00:00",
+            "last_period": "264.206",
+        },
+    )
+    hass.states.async_set(
+        COST,
+        "100",
+        {
+            "unit_of_measurement": "DKK",
+            "last_reset": "2026-10-31T23:00:00+00:00",
+            "last_period": "310.25",
+        },
+    )
+    await setup(hass, http, two_months(), energy_entity=ENERGY, home_cost_entity=COST)
+    await add(hass, kwh=80, pris=320, dato="2026-10-20")
+    await hass.async_block_till_done()
+    med = round(849 + round(0.62 * (264.206 + 80), 2), 2)
+    uden = round(310.25 + 320, 2)
+    assert state(hass, WITH + "_sidste_maaned") == str(med)
+    assert state(hass, WITHOUT + "_sidste_maaned") == str(uden)
+    assert state(hass, DIFF + "_sidste_maaned") == str(round(uden - med, 2))

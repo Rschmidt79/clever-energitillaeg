@@ -20,6 +20,7 @@ from .const import (
     CONF_ENERGY_ENTITIES,
     CONF_HOME_COST_ENTITY,
     CONF_HOME_PRICE,
+    CONF_PUBLIC_PRICE,
     CONF_SUBSCRIPTION,
     CONF_THRESHOLD,
     CONF_VAT,
@@ -60,6 +61,11 @@ SCHEMA = vol.Schema(
                 step=0.001,
                 mode=NumberSelectorMode.BOX,
                 unit_of_measurement="kr./kWh",
+            )
+        ),
+        vol.Optional(CONF_PUBLIC_PRICE): NumberSelector(
+            NumberSelectorConfig(
+                min=0, max=20, step=0.01, mode=NumberSelectorMode.BOX, unit_of_measurement="kr./kWh"
             )
         ),
     }

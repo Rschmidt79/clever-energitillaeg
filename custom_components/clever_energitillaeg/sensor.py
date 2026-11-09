@@ -400,7 +400,7 @@ class LastMonthSurchargeSensor(CleverEntity, SensorEntity):
 
 PUBLIC_NOTE = (
     "Offentlig ladning (fx DC-lynladning) tilføjet med handlingen "
-    "clever_energitillaeg.tilfoej_offentlig_ladning med kWh og den pris, du har betalt. "
+    "clever_energitillaeg.tilfoej_offentlig_ladning med kWh og evt. den pris, du har betalt. "
     "Med Clever er strømmen inkluderet i abonnementet; kWh tæller kun med i energitillægget "
     "(sats × kWh). Clever henfører en opladning til den måned, hvor den stopper."
 )
@@ -489,13 +489,17 @@ class PublicSurchargeSensor(PublicEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         value, rate, kwh = self._value()
-        paid = self.coordinator.public.paid(self._month(self._last))
+        month = self._month(self._last)
+        without = self.coordinator.public.cost_without(month, self.coordinator.public_price)
         return {
             "energi_kwh": kwh,
             "sats": rate,
-            "maaned": self._month(self._last),
-            "betalt": paid,
-            "besparelse_med_clever": None if value is None else round(paid - value, 2),
+            "maaned": month,
+            "betalt": self.coordinator.public.paid(month),
+            "uden_clever": without,
+            "besparelse_med_clever": (
+                None if value is None or without is None else round(without - value, 2)
+            ),
         }
 
 
@@ -517,12 +521,15 @@ class PublicPaidSensor(PublicEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         month = self._month(self._last)
-        kwh = self.coordinator.public.kwh(month)
-        paid = self.coordinator.public.paid(month)
+        public = self.coordinator.public
+        priced = round(public.kwh(month) - public.unpriced_kwh(month), 3)
+        paid = public.paid(month)
         return {
             "maaned": month,
-            "energi_kwh": kwh,
-            "pris_pr_kwh": round(paid / kwh, 2) if kwh else None,
+            "energi_kwh": public.kwh(month),
+            "energi_kwh_med_kvittering": priced,
+            "energi_kwh_uden_pris": public.unpriced_kwh(month),
+            "pris_pr_kwh": round(paid / priced, 2) if priced else None,
         }
 
 
@@ -542,20 +549,25 @@ class PublicSavingSensor(PublicEntity):
 
     def _value(self) -> tuple[float | None, dict[str, Any]]:
         month = self._month(self._last)
-        kwh = self.coordinator.public.kwh(month)
-        paid = self.coordinator.public.paid(month)
+        public = self.coordinator.public
+        kwh = public.kwh(month)
+        without = public.cost_without(month, self.coordinator.public_price)
         rate = month_rate(self.coordinator, month)
         clever = None if rate is None else round(rate * kwh, 2)
         info = {
             "maaned": month,
             "energi_kwh": kwh,
-            "betalt": paid,
+            "betalt": public.paid(month),
+            "uden_clever": without,
+            "alternativ_pris_pr_kwh": self.coordinator.public_price,
             "med_clever": clever,
             "sats": rate,
-            "note": "Betalt − energitillæg (sats × kWh). Positiv: Clever havde været billigst. "
-            "Abonnementet er ikke medregnet.",
+            "note": "Uden Clever (kvitteringer, ellers kWh × alternativ pris) − energitillæg "
+            "(sats × kWh). Positiv: Clever havde været billigst. Abonnementet er ikke medregnet.",
         }
-        return (None if clever is None else round(paid - clever, 2)), info
+        if clever is None or without is None:
+            return None, info
+        return round(without - clever, 2), info
 
     @property
     def available(self) -> bool:
@@ -636,7 +648,7 @@ class TotalSurchargeSensor(PublicEntity):
 COMPARISON_NOTE = (
     "Med Clever (Clever One + Clever Power) = abonnement + energitillæg (sats × alle kWh hjemme "
     "og ude); hjemmeladningens strøm dækkes 1:1. Uden Clever = det hjemmeladningen koster dig + "
-    "det du har betalt for offentlig ladning. Forskel = uden − med; positiv: Clever havde været "
+    "offentlig ladning (kvitteringens pris, ellers kWh × alternativ DC-pris). Forskel = uden − med; positiv: Clever havde været "
     "billigst. Indeværende måneds sats er foreløbig."
 )
 MONEY_UNITS = ("kr", "kr.", "DKK")
@@ -699,13 +711,16 @@ class ComparisonSensor(TotalSurchargeSensor):
         surcharge, info = TotalSurchargeSensor._value(self)
         month = self._month(self._last)
         subscription = self.coordinator.subscription
-        paid = self.coordinator.public.paid(month)
+        public = self.coordinator.public
+        paid = public.cost_without(month, self.coordinator.public_price)
         parts = info.get("energi_kwh_dele") or {}
         home_values = [v for k, v in parts.items() if k != "offentlig_ladning"]
         home_kwh = None if None in home_values else round(sum(home_values), 3)
         home_cost, reason = self._home_cost(home_kwh)
         with_clever = None if surcharge is None else round(subscription + surcharge, 2)
-        without = None if home_cost is None else round(home_cost + paid, 2)
+        if paid is None and reason is None:
+            reason = "dc_pris_mangler"
+        without = None if home_cost is None or paid is None else round(home_cost + paid, 2)
         diff = None if with_clever is None or without is None else round(without - with_clever, 2)
         attrs: dict[str, Any] = {
             "maaned": month,
@@ -722,7 +737,9 @@ class ComparisonSensor(TotalSurchargeSensor):
             "hjemmeladning_pris": home_cost,
             "hjemmeladning_kilde": self.coordinator.home_cost_entity
             or (None if self.coordinator.home_price is None else "fast kr./kWh"),
-            "offentlig_ladning_betalt": paid,
+            "offentlig_ladning_uden_clever": paid,
+            "offentlig_ladning_betalt": public.paid(month),
+            "alternativ_dc_pris_pr_kwh": self.coordinator.public_price,
             "mangler": reason,
             "note": COMPARISON_NOTE,
         }

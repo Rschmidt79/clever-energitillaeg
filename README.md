@@ -50,7 +50,7 @@ action: clever_energitillaeg.tilfoej_offentlig_ladning
 data:
   dato: "2026-11-08"   # valgfri: dagen opladningen stoppede (standard: i dag)
   kwh: 120
-  pris: 540            # kr. du har betalt i alt
+  pris: 540            # kr. du har betalt i alt (valgfri, se "alternativ pris" nedenfor)
   note: Tesla, tur til København   # valgfri
 ```
 
@@ -83,7 +83,9 @@ Under *Konfigurér*:
 - **Hjemmeladningens pris pr. måned:** en sensor i kr. (`kr`, `kr.` eller `DKK`), der nulstilles den 1. og har `last_reset`, fx en utility meter med `cycle: monthly` over din ladeprissensor. Sidste måned bruger dens `last_period`.
 - **Eller hjemmeladningens pris pr. kWh:** fast pris × månedens kWh fra energisensorerne.
 
-Er der valgt energisensorer, men ingen hjemmepris, er `uden_clever` og `forskel_med_clever` `unavailable` (attribut `mangler`).
+- **Alternativ pris for offentlig ladning (kr./kWh):** til dig, der *har* Clever og vil vide, hvad det havde kostet uden. Tilføj ladninger på Clevers net uden `pris`. Uden Clever regnes de som kWh × den alternative pris, fx Tesla- eller Ionity-prisen. Ladninger med `pris` (en kvittering) bruger altid kvitteringens beløb.
+
+Er der valgt energisensorer, men ingen hjemmepris, eller en ladning uden pris og ingen alternativ pris, er `uden_clever` og `forskel_med_clever` `unavailable` (attribut `mangler`).
 
 ### Dag for dag
 

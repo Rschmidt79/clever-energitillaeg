@@ -15,7 +15,7 @@ tilfoej_offentlig_ladning:
           mode: box
           unit_of_measurement: kWh
     pris:
-      required: true
+      required: false
       example: 540
       selector:
         number:

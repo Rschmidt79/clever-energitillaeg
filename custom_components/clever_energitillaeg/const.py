@@ -14,6 +14,7 @@ CONF_VAT = "vat_percent"
 CONF_SUBSCRIPTION = "subscription"
 CONF_HOME_COST_ENTITY = "home_cost_entity"  # kr. for home charging this month (utility meter)
 CONF_HOME_PRICE = "home_price"  # fixed kr./kWh, used when no cost sensor is chosen
+CONF_PUBLIC_PRICE = "public_price"  # kr./kWh for public charges without a receipt price
 
 DEFAULT_THRESHOLD = 0.89  # kr./kWh incl. VAT, Clever terms § 3.1.2
 DEFAULT_VAT = 25.0

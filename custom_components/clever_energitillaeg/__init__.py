@@ -45,7 +45,7 @@ MAX_PRICE = 100_000  # kr.
 ADD_SCHEMA = vol.Schema(
     {
         vol.Required("kwh"): vol.All(vol.Coerce(float), vol.Range(min=0.001, max=MAX_KWH)),
-        vol.Required("pris"): vol.All(vol.Coerce(float), vol.Range(min=0, max=MAX_PRICE)),
+        vol.Optional("pris"): vol.All(vol.Coerce(float), vol.Range(min=0, max=MAX_PRICE)),
         vol.Optional("dato"): cv.date,
         vol.Optional("note"): vol.All(cv.string, vol.Length(max=200)),
     }
@@ -97,7 +97,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         if stopped > today:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="future")
         charge = await coordinator.public.async_add(
-            call.data["kwh"], call.data["pris"], stopped, call.data.get("note")
+            call.data["kwh"], call.data.get("pris"), stopped, call.data.get("note")
         )
         return _charge_dict(charge)
 

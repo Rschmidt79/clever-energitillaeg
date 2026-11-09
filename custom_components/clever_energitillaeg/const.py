@@ -40,6 +40,10 @@ OBJECT_IDS = {
     "public_energy_last_month": "offentlig_ladning_sidste_maaned",
     "public_surcharge": "foreloebigt_energitillaeg_offentlig_ladning",
     "public_last_month_surcharge": "energitillaeg_sidste_maaned_offentlig_ladning",
+    "public_paid": "offentlig_ladning_betalt",
+    "public_paid_last_month": "offentlig_ladning_betalt_sidste_maaned",
+    "public_saving": "offentlig_ladning_besparelse_med_clever",
+    "public_saving_last_month": "offentlig_ladning_besparelse_med_clever_sidste_maaned",
     "total_surcharge": "foreloebigt_energitillaeg_i_alt",
     "total_last_month_surcharge": "energitillaeg_sidste_maaned_i_alt",
 }

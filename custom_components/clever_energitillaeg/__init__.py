@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import Any
 
 import voluptuous as vol
@@ -25,6 +24,7 @@ from .api import EnergiDataServiceApi
 from .const import (
     CONF_ENERGY_ENTITIES,
     CONF_ENERGY_ENTITY,
+    DK_TZ,
     DOMAIN,
     OBJECT_IDS,
     OLD_OBJECT_IDS,
@@ -41,10 +41,12 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 SERVICE_ADD = "tilfoej_offentlig_ladning"
 SERVICE_REMOVE = "fjern_offentlig_ladning"
 MAX_KWH = 1000
+MAX_PRICE = 100_000  # kr.
 ADD_SCHEMA = vol.Schema(
     {
         vol.Required("kwh"): vol.All(vol.Coerce(float), vol.Range(min=0.001, max=MAX_KWH)),
-        vol.Optional("tidspunkt"): cv.datetime,
+        vol.Required("pris"): vol.All(vol.Coerce(float), vol.Range(min=0, max=MAX_PRICE)),
+        vol.Optional("dato"): cv.date,
         vol.Optional("note"): vol.All(cv.string, vol.Length(max=200)),
     }
 )
@@ -70,8 +72,9 @@ def last_month_surcharge_object_id(energy_entity: str) -> str:
 def _charge_dict(charge: PublicCharge) -> dict[str, Any]:
     return {
         "id": charge.id,
-        "tidspunkt": charge.tidspunkt,
+        "dato": charge.dato,
         "kwh": charge.kwh,
+        "pris": charge.pris,
         "note": charge.note,
         "maaned": charge.month,
     }
@@ -89,14 +92,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     async def add(call: ServiceCall) -> ServiceResponse:
         coordinator = _coordinator(hass)
-        now = dt_util.now()
-        stopped = call.data.get("tidspunkt") or now
-        if stopped.tzinfo is None:
-            stopped = stopped.replace(tzinfo=dt_util.get_default_time_zone())
-        if stopped > now + timedelta(minutes=5):
+        today = dt_util.now().astimezone(DK_TZ).date()
+        stopped = call.data.get("dato") or today
+        if stopped > today:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="future")
         charge = await coordinator.public.async_add(
-            call.data["kwh"], dt_util.as_local(stopped), call.data.get("note")
+            call.data["kwh"], call.data["pris"], stopped, call.data.get("note")
         )
         return _charge_dict(charge)
 

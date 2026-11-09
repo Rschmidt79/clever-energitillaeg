@@ -55,6 +55,8 @@ async def async_setup_entry(
     for last in (False, True):
         entities.append(PublicEnergySensor(coordinator, last))
         entities.append(PublicSurchargeSensor(coordinator, last))
+        entities.append(PublicPaidSensor(coordinator, last))
+        entities.append(PublicSavingSensor(coordinator, last))
         entities.append(TotalSurchargeSensor(coordinator, energy_entities, last))
     # Surcharges for sensors no longer selected are removed, not left as orphans.
     registry = er.async_get(hass)
@@ -394,8 +396,9 @@ class LastMonthSurchargeSensor(CleverEntity, SensorEntity):
 
 PUBLIC_NOTE = (
     "Offentlig ladning (fx DC-lynladning) tilføjet med handlingen "
-    "clever_energitillaeg.tilfoej_offentlig_ladning. Clever medregner kWh 'både hjemme og ude på "
-    "netværket' i energitillægget og henfører en opladning til den måned, hvor den stopper."
+    "clever_energitillaeg.tilfoej_offentlig_ladning med kWh og den pris, du har betalt. "
+    "Med Clever er strømmen inkluderet i abonnementet; kWh tæller kun med i energitillægget "
+    "(sats × kWh). Clever henfører en opladning til den måned, hvor den stopper."
 )
 
 
@@ -417,7 +420,7 @@ class PublicEntity(CleverEntity, SensorEntity):
 
     def _charges(self, month: str) -> list[dict[str, Any]]:
         return [
-            {"id": c.id, "tidspunkt": c.tidspunkt, "kwh": c.kwh, "note": c.note}
+            {"id": c.id, "dato": c.dato, "kwh": c.kwh, "pris": c.pris, "note": c.note}
             for c in self.coordinator.public.for_month(month)
         ]
 
@@ -481,8 +484,86 @@ class PublicSurchargeSensor(PublicEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        _, rate, kwh = self._value()
-        return {"energi_kwh": kwh, "sats": rate, "maaned": self._month(self._last)}
+        value, rate, kwh = self._value()
+        paid = self.coordinator.public.paid(self._month(self._last))
+        return {
+            "energi_kwh": kwh,
+            "sats": rate,
+            "maaned": self._month(self._last),
+            "betalt": paid,
+            "besparelse_med_clever": None if value is None else round(paid - value, 2),
+        }
+
+
+class PublicPaidSensor(PublicEntity):
+    """What was actually paid for the month's public charging (entered by the user)."""
+
+    _attr_native_unit_of_measurement = "kr."
+    _attr_suggested_display_precision = 2
+    _attr_icon = "mdi:receipt-text"
+
+    def __init__(self, coordinator: CleverCoordinator, last: bool) -> None:
+        super().__init__(coordinator, "public_paid_last_month" if last else "public_paid")
+        self._last = last
+
+    @property
+    def native_value(self) -> float:
+        return self.coordinator.public.paid(self._month(self._last))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        month = self._month(self._last)
+        kwh = self.coordinator.public.kwh(month)
+        paid = self.coordinator.public.paid(month)
+        return {
+            "maaned": month,
+            "energi_kwh": kwh,
+            "pris_pr_kwh": round(paid / kwh, 2) if kwh else None,
+        }
+
+
+class PublicSavingSensor(PublicEntity):
+    """Paid minus what Clever would have charged (rate × kWh). Positive: Clever is cheaper.
+
+    The subscription itself is not included; it is paid whether or not you charge away.
+    """
+
+    _attr_native_unit_of_measurement = "kr."
+    _attr_suggested_display_precision = 2
+    _attr_icon = "mdi:scale-balance"
+
+    def __init__(self, coordinator: CleverCoordinator, last: bool) -> None:
+        super().__init__(coordinator, "public_saving_last_month" if last else "public_saving")
+        self._last = last
+
+    def _value(self) -> tuple[float | None, dict[str, Any]]:
+        month = self._month(self._last)
+        kwh = self.coordinator.public.kwh(month)
+        paid = self.coordinator.public.paid(month)
+        rate = month_rate(self.coordinator, month)
+        clever = None if rate is None else round(rate * kwh, 2)
+        info = {
+            "maaned": month,
+            "energi_kwh": kwh,
+            "betalt": paid,
+            "med_clever": clever,
+            "sats": rate,
+            "note": "Betalt − energitillæg (sats × kWh). Positiv: Clever havde været billigst. "
+            "Abonnementet er ikke medregnet.",
+        }
+        return (None if clever is None else round(paid - clever, 2)), info
+
+    @property
+    def available(self) -> bool:
+        return self._value()[0] is not None
+
+    @property
+    def native_value(self) -> float | None:
+        return self._value()[0]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return self._value()[1]
 
 
 class TotalSurchargeSensor(PublicEntity):

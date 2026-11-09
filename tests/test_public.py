@@ -15,6 +15,10 @@ PUB_SUR = "sensor.clever_energitillaeg_foreloebigt_energitillaeg_offentlig_ladni
 PUB_SUR_LAST = "sensor.clever_energitillaeg_energitillaeg_sidste_maaned_offentlig_ladning"
 TOTAL = "sensor.clever_energitillaeg_foreloebigt_energitillaeg_i_alt"
 TOTAL_LAST = "sensor.clever_energitillaeg_energitillaeg_sidste_maaned_i_alt"
+PAID = "sensor.clever_energitillaeg_offentlig_ladning_betalt"
+PAID_LAST = "sensor.clever_energitillaeg_offentlig_ladning_betalt_sidste_maaned"
+SAVING = "sensor.clever_energitillaeg_offentlig_ladning_besparelse_med_clever"
+SAVING_LAST = "sensor.clever_energitillaeg_offentlig_ladning_besparelse_med_clever_sidste_maaned"
 
 
 def two_months():
@@ -41,6 +45,7 @@ async def test_nothing_entered_is_zero(hass, dk_time, http):
     await setup(hass, http, month_records("2026-11"))
     assert state(hass, PUB) == "0" and state(hass, PUB_SUR) == "0.0"
     assert state(hass, TOTAL) == "0.0"
+    assert state(hass, PAID) == "0" and state(hass, SAVING) == "0.0"
     pub = hass.states.get(PUB)
     assert pub.attributes["device_class"] == "energy"
     assert pub.attributes["state_class"] == "total"
@@ -50,21 +55,28 @@ async def test_nothing_entered_is_zero(hass, dk_time, http):
 async def test_add_dc_charge_this_month(hass, dk_time, http):
     energy(hass, "189.574")
     await setup(hass, http, month_records("2026-11"), energy_entity=ENERGY)
-    resp = await add(hass, kwh=120, note="Tur til København")
-    assert resp["kwh"] == 120.0 and resp["maaned"] == "2026-11" and len(resp["id"]) == 8
-    assert resp["tidspunkt"].startswith("2026-11-06T09:00")
+    resp = await add(hass, kwh=120, pris=540, note="Tur til København")
+    assert resp["kwh"] == 120.0 and resp["pris"] == 540.0 and len(resp["id"]) == 8
+    assert resp["maaned"] == "2026-11" and resp["dato"] == "2026-11-06"  # default: today
     await hass.async_block_till_done()
     assert state(hass, PUB) == "120.0"
     charges = hass.states.get(PUB).attributes["ladninger"]
     assert charges == [
         {
             "id": resp["id"],
-            "tidspunkt": resp["tidspunkt"],
+            "dato": "2026-11-06",
             "kwh": 120.0,
+            "pris": 540.0,
             "note": "Tur til København",
         }
     ]
-    assert state(hass, PUB_SUR) == str(round(1.59 * 120, 2))
+    assert state(hass, PUB_SUR) == str(round(1.59 * 120, 2))  # 190.8: only the surcharge
+    assert state(hass, PAID) == "540.0"
+    assert hass.states.get(PAID).attributes["pris_pr_kwh"] == 4.5
+    saving = hass.states.get(SAVING)
+    assert saving.state == str(round(540 - 190.8, 2))
+    assert saving.attributes["betalt"] == 540.0 and saving.attributes["med_clever"] == 190.8
+    assert hass.states.get(PUB_SUR).attributes["besparelse_med_clever"] == 349.2
     # The home surcharge is unchanged; the total is rate × all kWh, as Clever bills it.
     assert state(hass, "sensor.clever_energitillaeg_foreloebigt_energitillaeg_monthly_energy") == (
         str(round(1.59 * 189.574, 2))
@@ -77,15 +89,15 @@ async def test_add_dc_charge_this_month(hass, dk_time, http):
     energy(hass, "200")
     await hass.async_block_till_done()
     assert state(hass, TOTAL) == str(round(1.59 * 320, 2))
-    await add(hass, kwh=30.5)
+    await add(hass, kwh=30.5, pris=150.25)
     await hass.async_block_till_done()
-    assert state(hass, PUB) == "150.5"
+    assert state(hass, PUB) == "150.5" and state(hass, PAID) == "690.25"
 
 
 async def test_total_unavailable_when_an_energy_sensor_is(hass, dk_time, http):
     energy(hass, "unavailable")
     await setup(hass, http, month_records("2026-11"), energy_entity=ENERGY)
-    await add(hass, kwh=120)
+    await add(hass, kwh=120, pris=540)
     await hass.async_block_till_done()
     assert state(hass, PUB_SUR) == "190.8"
     assert state(hass, TOTAL) == "unavailable"
@@ -103,28 +115,21 @@ async def test_charge_in_last_month(hass, dk_time, http):
         },
     )
     await setup(hass, http, two_months(), energy_entity=ENERGY)
-    resp = await add(hass, kwh=80, tidspunkt="2026-10-20 18:30:00")
+    resp = await add(hass, kwh=80, pris=320, dato="2026-10-20")
     await hass.async_block_till_done()
-    assert resp["maaned"] == "2026-10" and resp["tidspunkt"] == "2026-10-20T18:30:00+02:00"
+    assert resp["maaned"] == "2026-10" and resp["dato"] == "2026-10-20"
     assert state(hass, PUB) == "0" and state(hass, PUB_LAST) == "80.0"
     assert state(hass, PUB_SUR_LAST) == str(round(0.62 * 80, 2))
+    assert state(hass, PAID_LAST) == "320.0" and state(hass, PAID) == "0"
+    assert state(hass, SAVING_LAST) == str(round(320 - 0.62 * 80, 2))
     assert state(hass, TOTAL_LAST) == str(round(0.62 * (264.206 + 80), 2))
     assert state(hass, TOTAL) == str(round(1.59 * 189.574, 2))
 
 
-async def test_charge_belongs_to_month_it_stopped(hass, dk_time, http):
-    """Danish time decides: 31 Oct 23:30 UTC is 1 Nov in Denmark."""
-    await setup(hass, http, two_months())
-    resp = await add(hass, kwh=40, tidspunkt="2026-10-31T23:30:00+00:00")
-    assert resp["maaned"] == "2026-11"
-    await hass.async_block_till_done()
-    assert state(hass, PUB) == "40.0" and state(hass, PUB_LAST) == "0"
-
-
 async def test_remove(hass, dk_time, http):
     await setup(hass, http, month_records("2026-11"))
-    first = await add(hass, kwh=120)
-    await add(hass, kwh=10, tidspunkt="2026-11-02 12:00:00")  # added last, stopped earlier
+    first = await add(hass, kwh=120, pris=540)
+    await add(hass, kwh=10, pris=45, dato="2026-11-02")  # added last, stopped earlier
     removed = await remove(hass)
     assert removed["kwh"] == 10.0  # the most recently added, not the latest time
     await hass.async_block_till_done()
@@ -142,25 +147,39 @@ async def test_remove(hass, dk_time, http):
 async def test_invalid_kwh(hass, dk_time, http, kwh):
     await setup(hass, http, month_records("2026-11"))
     with pytest.raises(vol.Invalid):
-        await add(hass, kwh=kwh)
+        await add(hass, kwh=kwh, pris=10)
+
+
+@pytest.mark.parametrize("data", [{"kwh": 10}, {"kwh": 10, "pris": -1}, {"kwh": 10, "pris": "x"}])
+async def test_price_required_and_valid(hass, dk_time, http, data):
+    await setup(hass, http, month_records("2026-11"))
+    with pytest.raises(vol.Invalid):
+        await add(hass, **data)
+
+
+async def test_free_charge_is_allowed(hass, dk_time, http):
+    await setup(hass, http, month_records("2026-11"))
+    await add(hass, kwh=20, pris=0)
+    await hass.async_block_till_done()
+    assert state(hass, PAID) == "0.0" and state(hass, SAVING) == str(round(-1.59 * 20, 2))
 
 
 async def test_future_time_rejected(hass, dk_time, http):
     await setup(hass, http, month_records("2026-11"))
     with pytest.raises(ServiceValidationError):
-        await add(hass, kwh=10, tidspunkt="2026-11-07 09:00:00")
+        await add(hass, kwh=10, pris=10, dato="2026-11-07")
 
 
 async def test_not_loaded(hass, dk_time, http):
     entry = await setup(hass, http, month_records("2026-11"))
     await hass.config_entries.async_unload(entry.entry_id)
     with pytest.raises(ServiceValidationError):
-        await add(hass, kwh=10)
+        await add(hass, kwh=10, pris=10)
 
 
 async def test_survives_restart(hass, dk_time, http, hass_storage):
     entry = await setup(hass, http, month_records("2026-11"))
-    await add(hass, kwh=120, note="Tur")
+    await add(hass, kwh=120, pris=540, note="Tur")
     key = f"{DOMAIN}.{entry.entry_id}.offentlig_ladning"
     assert hass_storage[key]["data"]["ladninger"][0]["kwh"] == 120.0
     http.respond(body(month_records("2026-11")))
@@ -168,13 +187,14 @@ async def test_survives_restart(hass, dk_time, http, hass_storage):
     await hass.async_block_till_done()
     assert state(hass, PUB) == "120.0"
     assert hass.states.get(PUB).attributes["ladninger"][0]["note"] == "Tur"
+    assert state(hass, PAID) == "540.0"
 
 
 async def test_month_change_moves_charges_to_last_month(hass, freezer, http):
     await hass.config.async_set_time_zone("Europe/Copenhagen")
     freezer.move_to(local(2026, 11, 30, 20, 0))
     await setup(hass, http, month_records("2026-11"))
-    await add(hass, kwh=120)
+    await add(hass, kwh=120, pris=540)
     await hass.async_block_till_done()
     assert state(hass, PUB) == "120.0"
     rate_nov = float(state(hass, "sensor.clever_energitillaeg_foreloebig_sats"))
@@ -187,3 +207,5 @@ async def test_month_change_moves_charges_to_last_month(hass, freezer, http):
     await at(hass, freezer, local(2026, 12, 1, 0, 5))
     assert state(hass, PUB_SUR_LAST) == str(round(rate_nov * 120, 2))
     assert state(hass, TOTAL_LAST) == str(round(rate_nov * 120, 2))
+    assert state(hass, PAID_LAST) == "540.0" and state(hass, PAID) == "0"
+    assert state(hass, SAVING_LAST) == str(round(540 - rate_nov * 120, 2))

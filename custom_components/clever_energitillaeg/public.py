@@ -1,8 +1,10 @@
 """Public charging (e.g. DC fast charging on a trip) entered by hand.
 
 Clever counts the monthly kWh "både hjemme og ude på netværket", so public charging on Clever's
-network gets the same energy surcharge as charging at home. Clever attributes a charge to the
-month in which it stopped, so every charge is stored with the time it ended.
+network gets the same energy surcharge as charging at home, and nothing else (the power is
+included in the subscription). Each charge is entered with what was actually paid elsewhere
+(e.g. at Tesla), so the month shows paid vs. what it would have cost with Clever.
+Clever attributes a charge to the month in which it stopped, so the date is the stop date.
 """
 
 from __future__ import annotations
@@ -10,7 +12,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import date
 from typing import Any
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
@@ -27,13 +29,14 @@ KEEP_MONTHS = 13  # this month and the 12 before; older charges are dropped on c
 @dataclass(frozen=True)
 class PublicCharge:
     id: str
-    tidspunkt: str  # ISO time the charge stopped
+    dato: str  # ISO date (Danish) the charge stopped
     kwh: float
+    pris: float  # kr. actually paid for the charge
     note: str | None = None
 
     @property
     def month(self) -> str:
-        return month_of(datetime.fromisoformat(self.tidspunkt))
+        return date.fromisoformat(self.dato).strftime("%Y-%m")
 
 
 class PublicCharging:
@@ -53,11 +56,12 @@ class PublicCharging:
             try:
                 charge = PublicCharge(
                     id=str(item["id"]),
-                    tidspunkt=str(item["tidspunkt"]),
+                    dato=str(item["dato"]),
                     kwh=float(item["kwh"]),
+                    pris=float(item["pris"]),
                     note=item.get("note"),
                 )
-                _ = charge.month  # validates the time
+                _ = charge.month  # validates the date
             except KeyError, TypeError, ValueError:
                 continue
             charges.append(charge)
@@ -73,11 +77,14 @@ class PublicCharging:
         for listener in list(self._listeners):
             listener()
 
-    async def async_add(self, kwh: float, stopped: datetime, note: str | None) -> PublicCharge:
+    async def async_add(
+        self, kwh: float, pris: float, stopped: date, note: str | None
+    ) -> PublicCharge:
         charge = PublicCharge(
             id=uuid.uuid4().hex[:8],
-            tidspunkt=stopped.isoformat(timespec="seconds"),
+            dato=stopped.isoformat(),
             kwh=round(float(kwh), 3),
+            pris=round(float(pris), 2),
             note=note or None,
         )
         oldest = month_of(dt_util.now())
@@ -102,7 +109,10 @@ class PublicCharging:
         return removed
 
     def for_month(self, month: str) -> list[PublicCharge]:
-        return sorted((c for c in self.charges if c.month == month), key=lambda c: c.tidspunkt)
+        return sorted((c for c in self.charges if c.month == month), key=lambda c: c.dato)
 
     def kwh(self, month: str) -> float:
         return round(sum(c.kwh for c in self.for_month(month)), 3)
+
+    def paid(self, month: str) -> float:
+        return round(sum(c.pris for c in self.for_month(month)), 2)

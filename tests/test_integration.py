@@ -292,6 +292,12 @@ async def test_danish_entity_ids_and_names(hass, dk_time, http):
         "public_last_month_surcharge": (
             "sensor.clever_energitillaeg_energitillaeg_sidste_maaned_offentlig_ladning"
         ),
+        "public_paid": "sensor.clever_energitillaeg_offentlig_ladning_betalt",
+        "public_paid_last_month": "sensor.clever_energitillaeg_offentlig_ladning_betalt_sidste_maaned",
+        "public_saving": "sensor.clever_energitillaeg_offentlig_ladning_besparelse_med_clever",
+        "public_saving_last_month": (
+            "sensor.clever_energitillaeg_offentlig_ladning_besparelse_med_clever_sidste_maaned"
+        ),
         "total_surcharge": "sensor.clever_energitillaeg_foreloebigt_energitillaeg_i_alt",
         "total_last_month_surcharge": "sensor.clever_energitillaeg_energitillaeg_sidste_maaned_i_alt",
     }
@@ -340,7 +346,7 @@ async def test_migrates_0_1_0_entry_ids_and_single_sensor(hass, dk_time, http):
     assert e["average_dk2"] == "sensor.mit_eget_navn"
     # Same registry entry (renamed, not recreated): the recorder keeps its history.
     assert reg.async_get(e["surcharge"]).id == old_surcharge.id
-    assert len([x for x in reg.entities.values() if x.platform == "clever_energitillaeg"]) == 14
+    assert len([x for x in reg.entities.values() if x.platform == "clever_energitillaeg"]) == 18
     assert hass.states.get("sensor.clever_energitillaeg_foreloebig_sats").state == "1.59"
     assert hass.states.get(e["surcharge"]).state == "15.9"
     assert hass.states.get("sensor.clever_energitillaeg_preliminary_rate") is None

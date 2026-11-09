@@ -28,31 +28,44 @@ Metoden giver **præcis Clevers offentliggjorte satser** for alle 13 afsluttede 
 | `sensor.clever_energitillaeg_foreloebigt_energitillaeg_<sensor>` | kr. | Én pr. valgt energisensor, opkaldt efter den (fx to biler eller to ladebokse) |
 | `sensor.clever_energitillaeg_sats_sidste_maaned` | kr./kWh | Sidste måneds sats, beregnet ud fra hele måneden; med `landsgennemsnit`, `dage` m.m. |
 | `sensor.clever_energitillaeg_energitillaeg_sidste_maaned_<sensor>` | kr. | Sidste måneds sats × energisensorens `last_period` (kræver en utility meter) |
-| `sensor.clever_energitillaeg_offentlig_ladning` / `_sidste_maaned` | kWh | Offentlig ladning, du har tilføjet (se nedenfor). Attribut `ladninger` |
-| `sensor.clever_energitillaeg_foreloebigt_energitillaeg_offentlig_ladning` | kr. | Sats × offentlig ladning denne måned |
-| `sensor.clever_energitillaeg_energitillaeg_sidste_maaned_offentlig_ladning` | kr. | Sidste måneds sats × offentlig ladning sidste måned |
+| `sensor.clever_energitillaeg_offentlig_ladning…` | kWh / kr. | Offentlig ladning: kWh, betalt, med Clever og besparelse (se nedenfor) |
 | `sensor.clever_energitillaeg_foreloebigt_energitillaeg_i_alt` | kr. | Sats × (alle energisensorer + offentlig ladning). Attribut `energi_kwh_dele` |
 | `sensor.clever_energitillaeg_energitillaeg_sidste_maaned_i_alt` | kr. | Det samme for sidste måned |
 
 Sats og gennemsnit gemmes som langtidsstatistik, så HA's historik og statistikgrafer kan vise dem måned efter måned.
 
-### Offentlig ladning (DC/lynladning)
+### Offentlig ladning (DC/lynladning): hvad havde det kostet med Clever?
 
-Clever medregner dit månedlige kWh-forbrug "både hjemme og ude på netværket" i energitillægget ([clever.dk/energitillaeg](https://clever.dk/satser-tillaeg-og-priser/energitillaeg/)). Med Clever One betaler du ikke ekstra for at lade på Clevers lynladere, men kWh tæller med i tillægget med **samme sats** som hjemme. Opladning hos andre operatører (roaming) betales med operatørens pris og er ikke med her.
+Med Clever One er strømmen inkluderet i abonnementet, også på Clevers lynladere ([opladning med abonnement](https://clever.dk/ladeloesninger/opladning-med-abonnement/)). Til gengæld tæller kWh med i energitillægget, fordi Clever regner med dit månedlige forbrug "både hjemme og ude på netværket" ([clever.dk/energitillaeg](https://clever.dk/satser-tillaeg-og-priser/energitillaeg/)). Har du ladet et andet sted, fx hos Tesla, kan du sammenligne det, du har betalt, med det, det havde kostet med Clever:
 
-Ladning ude måles ikke af din ladeboks, så du tilføjer den selv:
+```
+med Clever = månedens sats × kWh            (kun energitillægget, ingen kWh-pris)
+besparelse = betalt − med Clever            (positiv: Clever havde været billigst)
+```
+
+Abonnementet er ikke medregnet, fordi det betales uanset. Tilføj hver ladning:
 
 ```yaml
 action: clever_energitillaeg.tilfoej_offentlig_ladning
 data:
+  dato: "2026-11-08"   # valgfri: dagen opladningen stoppede (standard: i dag)
   kwh: 120
-  tidspunkt: "2026-11-08 17:30:00"   # valgfri: hvornår opladningen stoppede (standard: nu)
-  note: Tur til København            # valgfri
+  pris: 540            # kr. du har betalt i alt
+  note: Tesla, tur til København   # valgfri
 ```
 
-Det kan også gøres under *Udviklerværktøjer → Handlinger*. Clever henfører en opladning til den måned, hvor den **stopper**, så det er tidspunktet, der afgør måneden. `clever_energitillaeg.fjern_offentlig_ladning` fjerner den senest tilføjede ladning eller en bestemt med `id` (se attributten `ladninger`). Ladningerne gemmes i Home Assistant og overlever genstart. De seneste 13 måneder gemmes.
+Det kan også gøres under *Udviklerværktøjer → Handlinger*. Clever henfører en opladning til den måned, hvor den **stopper**, så datoen afgør måneden. `clever_energitillaeg.fjern_offentlig_ladning` fjerner den senest tilføjede ladning eller en bestemt med `id` (se attributten `ladninger`). Ladningerne gemmes i Home Assistant, overlever genstart og gemmes i 13 måneder.
 
-`..._i_alt` er sats × (månedens kWh fra alle valgte energisensorer + offentlig ladning), som Clever regner det. Den er `unavailable`, hvis en af energisensorerne ikke kan bruges, så en del aldrig tæller som 0.
+| Entitet (også `_sidste_maaned`) | Enhed | |
+|---|---|---|
+| `sensor.clever_energitillaeg_offentlig_ladning` | kWh | Attribut `ladninger` (dato, kWh, pris, note, id) |
+| `sensor.clever_energitillaeg_offentlig_ladning_betalt` | kr. | Det du har betalt. Attribut `pris_pr_kwh` |
+| `sensor.clever_energitillaeg_foreloebigt_energitillaeg_offentlig_ladning` | kr. | Med Clever: sats × kWh (sidste måned: `energitillaeg_sidste_maaned_offentlig_ladning`) |
+| `sensor.clever_energitillaeg_offentlig_ladning_besparelse_med_clever` | kr. | Betalt − med Clever |
+
+Indeværende måneds sats er foreløbig, så "med Clever" og besparelsen ændrer sig frem til månedens udgang.
+
+`..._i_alt` er sats × (månedens kWh fra alle valgte energisensorer + offentlig ladning), altså hele dit energitillæg med Clever. Den er `unavailable`, hvis en af energisensorerne ikke kan bruges, så en del aldrig tæller som 0.
 
 ### Dag for dag
 

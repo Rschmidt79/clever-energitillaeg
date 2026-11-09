@@ -60,31 +60,47 @@
         "name": "Offentlig ladning sidste måned"
       },
       "public_surcharge": {
-        "name": "Foreløbigt energitillæg – offentlig ladning"
+        "name": "Offentlig ladning med Clever (energitillæg)"
       },
       "public_last_month_surcharge": {
-        "name": "Energitillæg sidste måned – offentlig ladning"
+        "name": "Offentlig ladning med Clever sidste måned (energitillæg)"
       },
       "total_surcharge": {
         "name": "Foreløbigt energitillæg i alt"
       },
       "total_last_month_surcharge": {
         "name": "Energitillæg sidste måned i alt"
+      },
+      "public_paid": {
+        "name": "Offentlig ladning betalt"
+      },
+      "public_paid_last_month": {
+        "name": "Offentlig ladning betalt sidste måned"
+      },
+      "public_saving": {
+        "name": "Offentlig ladning besparelse med Clever"
+      },
+      "public_saving_last_month": {
+        "name": "Offentlig ladning besparelse med Clever sidste måned"
       }
     }
   },
   "services": {
     "tilfoej_offentlig_ladning": {
       "name": "Tilføj offentlig ladning",
-      "description": "Tilføjer kWh fra offentlig ladning, fx DC-lynladning på en tur, til månedens forbrug. Clever medregner forbrug både hjemme og ude på netværket i energitillægget.",
+      "description": "Tilføjer en offentlig ladning, fx DC-lynladning hos Tesla, med kWh og den pris, du har betalt. Med Clever er strømmen inkluderet i abonnementet, og kWh tæller kun med i energitillægget. Sensorerne viser betalt, hvad det havde kostet med Clever, og forskellen.",
       "fields": {
+        "dato": {
+          "name": "Dato",
+          "description": "Dagen opladningen stoppede. Clever henfører den til den måned, hvor den stopper. Tom: i dag."
+        },
         "kwh": {
           "name": "kWh",
           "description": "Opladet energi i kWh."
         },
-        "tidspunkt": {
-          "name": "Stoppet",
-          "description": "Hvornår opladningen stoppede. Clever henfører den til den måned, hvor den stopper. Tom: nu."
+        "pris": {
+          "name": "Pris",
+          "description": "Det du har betalt for ladningen i alt, i kr."
         },
         "note": {
           "name": "Note",
@@ -108,7 +124,7 @@
       "message": "Clever energitillæg er ikke indlæst."
     },
     "future": {
-      "message": "Tidspunktet ligger i fremtiden."
+      "message": "Datoen ligger i fremtiden."
     },
     "not_found": {
       "message": "Ladningen findes ikke."

@@ -2,9 +2,9 @@
 
 ## 0.4.0 – 2026-11-09
 
-- Offentlig ladning (fx DC-lynladning på en tur): handlingerne `clever_energitillaeg.tilfoej_offentlig_ladning` (kWh, tidspunkt for stop, note) og `clever_energitillaeg.fjern_offentlig_ladning`. Ladningerne gemmes og overlever genstart.
-- Nye sensorer: `offentlig_ladning` og `offentlig_ladning_sidste_maaned` (kWh, med listen `ladninger`), `foreloebigt_energitillaeg_offentlig_ladning` og `energitillaeg_sidste_maaned_offentlig_ladning` (kr.).
-- Nye sensorer `foreloebigt_energitillaeg_i_alt` og `energitillaeg_sidste_maaned_i_alt`: sats × (alle valgte energisensorer + offentlig ladning), som Clever opkræver det.
+- Offentlig ladning (fx DC-lynladning hos Tesla): handlingen `clever_energitillaeg.tilfoej_offentlig_ladning` med dato, kWh, betalt pris og note, og `clever_energitillaeg.fjern_offentlig_ladning`. Ladningerne gemmes og overlever genstart.
+- Nye sensorer for denne og sidste måned: `offentlig_ladning` (kWh, med listen `ladninger`), `offentlig_ladning_betalt` (kr.), `foreloebigt_energitillaeg_offentlig_ladning` / `energitillaeg_sidste_maaned_offentlig_ladning` (med Clever: sats × kWh) og `offentlig_ladning_besparelse_med_clever` (betalt − med Clever).
+- Nye sensorer `foreloebigt_energitillaeg_i_alt` og `energitillaeg_sidste_maaned_i_alt`: sats × (alle valgte energisensorer + offentlig ladning).
 
 ## 0.3.0 – 2026-11-07
 

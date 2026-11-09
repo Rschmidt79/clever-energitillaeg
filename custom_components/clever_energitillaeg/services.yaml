@@ -1,5 +1,9 @@
 tilfoej_offentlig_ladning:
   fields:
+    dato:
+      required: false
+      selector:
+        date:
     kwh:
       required: true
       example: 120
@@ -10,13 +14,19 @@ tilfoej_offentlig_ladning:
           step: 0.1
           mode: box
           unit_of_measurement: kWh
-    tidspunkt:
-      required: false
+    pris:
+      required: true
+      example: 540
       selector:
-        datetime:
+        number:
+          min: 0
+          max: 100000
+          step: 0.01
+          mode: box
+          unit_of_measurement: kr.
     note:
       required: false
-      example: Tur til København
+      example: Tesla Supercharger, tur til København
       selector:
         text:
 fjern_offentlig_ladning:

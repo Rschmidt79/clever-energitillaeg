@@ -52,7 +52,66 @@
       },
       "last_month_rate": {
         "name": "Sats sidste måned"
+      },
+      "public_energy": {
+        "name": "Offentlig ladning"
+      },
+      "public_energy_last_month": {
+        "name": "Offentlig ladning sidste måned"
+      },
+      "public_surcharge": {
+        "name": "Foreløbigt energitillæg – offentlig ladning"
+      },
+      "public_last_month_surcharge": {
+        "name": "Energitillæg sidste måned – offentlig ladning"
+      },
+      "total_surcharge": {
+        "name": "Foreløbigt energitillæg i alt"
+      },
+      "total_last_month_surcharge": {
+        "name": "Energitillæg sidste måned i alt"
       }
+    }
+  },
+  "services": {
+    "tilfoej_offentlig_ladning": {
+      "name": "Tilføj offentlig ladning",
+      "description": "Tilføjer kWh fra offentlig ladning, fx DC-lynladning på en tur, til månedens forbrug. Clever medregner forbrug både hjemme og ude på netværket i energitillægget.",
+      "fields": {
+        "kwh": {
+          "name": "kWh",
+          "description": "Opladet energi i kWh."
+        },
+        "tidspunkt": {
+          "name": "Stoppet",
+          "description": "Hvornår opladningen stoppede. Clever henfører den til den måned, hvor den stopper. Tom: nu."
+        },
+        "note": {
+          "name": "Note",
+          "description": "Valgfri, fx ladestation eller tur."
+        }
+      }
+    },
+    "fjern_offentlig_ladning": {
+      "name": "Fjern offentlig ladning",
+      "description": "Fjerner en tilføjet ladning. Uden id fjernes den senest tilføjede.",
+      "fields": {
+        "id": {
+          "name": "Id",
+          "description": "Ladningens id (se attributten ladninger på sensoren Offentlig ladning)."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Clever energitillæg er ikke indlæst."
+    },
+    "future": {
+      "message": "Tidspunktet ligger i fremtiden."
+    },
+    "not_found": {
+      "message": "Ladningen findes ikke."
     }
   }
 }

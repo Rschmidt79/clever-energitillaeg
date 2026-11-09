@@ -2,11 +2,24 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+from typing import Any
+
+import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+)
+from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.typing import ConfigType
+from homeassistant.util import dt as dt_util
 
 from .api import EnergiDataServiceApi
 from .const import (
@@ -18,9 +31,24 @@ from .const import (
     SURCHARGE_OBJECT_ID,
 )
 from .coordinator import CleverCoordinator
+from .public import PublicCharge
 
 PLATFORMS = [Platform.SENSOR]
 type CleverConfigEntry = ConfigEntry[CleverCoordinator]
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+SERVICE_ADD = "tilfoej_offentlig_ladning"
+SERVICE_REMOVE = "fjern_offentlig_ladning"
+MAX_KWH = 1000
+ADD_SCHEMA = vol.Schema(
+    {
+        vol.Required("kwh"): vol.All(vol.Coerce(float), vol.Range(min=0.001, max=MAX_KWH)),
+        vol.Optional("tidspunkt"): cv.datetime,
+        vol.Optional("note"): vol.All(cv.string, vol.Length(max=200)),
+    }
+)
+REMOVE_SCHEMA = vol.Schema({vol.Optional("id"): cv.string})
 
 
 def surcharge_key(energy_entity: str) -> str:
@@ -37,6 +65,59 @@ def last_month_surcharge_key(energy_entity: str) -> str:
 
 def last_month_surcharge_object_id(energy_entity: str) -> str:
     return f"energitillaeg_sidste_maaned_{energy_entity.split('.', 1)[-1]}"
+
+
+def _charge_dict(charge: PublicCharge) -> dict[str, Any]:
+    return {
+        "id": charge.id,
+        "tidspunkt": charge.tidspunkt,
+        "kwh": charge.kwh,
+        "note": charge.note,
+        "maaned": charge.month,
+    }
+
+
+def _coordinator(hass: HomeAssistant) -> CleverCoordinator:
+    entries = hass.config_entries.async_loaded_entries(DOMAIN)
+    if not entries:
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="not_loaded")
+    return entries[0].runtime_data
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Services for public charging (e.g. DC fast charging) that no sensor measures."""
+
+    async def add(call: ServiceCall) -> ServiceResponse:
+        coordinator = _coordinator(hass)
+        now = dt_util.now()
+        stopped = call.data.get("tidspunkt") or now
+        if stopped.tzinfo is None:
+            stopped = stopped.replace(tzinfo=dt_util.get_default_time_zone())
+        if stopped > now + timedelta(minutes=5):
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="future")
+        charge = await coordinator.public.async_add(
+            call.data["kwh"], dt_util.as_local(stopped), call.data.get("note")
+        )
+        return _charge_dict(charge)
+
+    async def remove(call: ServiceCall) -> ServiceResponse:
+        coordinator = _coordinator(hass)
+        removed = await coordinator.public.async_remove(call.data.get("id"))
+        if removed is None:
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="not_found")
+        return _charge_dict(removed)
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_ADD, add, schema=ADD_SCHEMA, supports_response=SupportsResponse.OPTIONAL
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_REMOVE,
+        remove,
+        schema=REMOVE_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    return True
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: CleverConfigEntry) -> bool:

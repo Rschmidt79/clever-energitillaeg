@@ -1,5 +1,11 @@
 # Ændringer
 
+## 0.4.0 – 2026-11-09
+
+- Offentlig ladning (fx DC-lynladning på en tur): handlingerne `clever_energitillaeg.tilfoej_offentlig_ladning` (kWh, tidspunkt for stop, note) og `clever_energitillaeg.fjern_offentlig_ladning`. Ladningerne gemmes og overlever genstart.
+- Nye sensorer: `offentlig_ladning` og `offentlig_ladning_sidste_maaned` (kWh, med listen `ladninger`), `foreloebigt_energitillaeg_offentlig_ladning` og `energitillaeg_sidste_maaned_offentlig_ladning` (kr.).
+- Nye sensorer `foreloebigt_energitillaeg_i_alt` og `energitillaeg_sidste_maaned_i_alt`: sats × (alle valgte energisensorer + offentlig ladning), som Clever opkræver det.
+
 ## 0.3.0 – 2026-11-07
 
 - Dag for dag: attributten `dage` (dagsgennemsnit, måned-til-dato og sats efter hver dag) til grafer som Clevers.

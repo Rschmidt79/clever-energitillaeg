@@ -27,6 +27,7 @@ from .const import (
     MONTH_START_TIME,
     RETRY_TIME,
 )
+from .public import PublicCharging
 
 _LOGGER = logging.getLogger(__name__)
 STORAGE_VERSION = 1
@@ -64,9 +65,14 @@ class CleverCoordinator(DataUpdateCoordinator[CleverData]):
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}"
         )
         self._stored: CleverData | None = None
+        self.public = PublicCharging(hass, entry.entry_id)
 
     async def async_load_stored(self) -> None:
-        """Last successful calculation, so a failed fetch after restart keeps the month's value."""
+        """Last successful calculation, so a failed fetch after restart keeps the month's value.
+
+        Also loads the public charges entered by the user.
+        """
+        await self.public.async_load()
         raw = await self._store.async_load()
         if not raw or raw.get("threshold") != self.threshold or raw.get("vat") != self.vat:
             return

@@ -36,6 +36,12 @@ OBJECT_IDS = {
     "average_dk2": "gennemsnit_dk2",
     "last_fetch": "seneste_hentning",
     "last_month_rate": "sats_sidste_maaned",
+    "public_energy": "offentlig_ladning",
+    "public_energy_last_month": "offentlig_ladning_sidste_maaned",
+    "public_surcharge": "foreloebigt_energitillaeg_offentlig_ladning",
+    "public_last_month_surcharge": "energitillaeg_sidste_maaned_offentlig_ladning",
+    "total_surcharge": "foreloebigt_energitillaeg_i_alt",
+    "total_last_month_surcharge": "energitillaeg_sidste_maaned_i_alt",
 }
 SURCHARGE_OBJECT_ID = "foreloebigt_energitillaeg"  # + "_" + the energy sensor's object id
 

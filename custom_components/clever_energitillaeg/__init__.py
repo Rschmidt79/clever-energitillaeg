@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 import voluptuous as vol
@@ -33,7 +34,7 @@ from .const import (
 from .coordinator import CleverCoordinator
 from .public import PublicCharge
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.BUTTON, Platform.DATE, Platform.NUMBER, Platform.SENSOR, Platform.TEXT]
 type CleverConfigEntry = ConfigEntry[CleverCoordinator]
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -45,7 +46,7 @@ MAX_PRICE = 100_000  # kr.
 ADD_SCHEMA = vol.Schema(
     {
         vol.Required("kwh"): vol.All(vol.Coerce(float), vol.Range(min=0.001, max=MAX_KWH)),
-        vol.Required("pris"): vol.All(vol.Coerce(float), vol.Range(min=0, max=MAX_PRICE)),
+        vol.Optional("pris"): vol.All(vol.Coerce(float), vol.Range(min=0, max=MAX_PRICE)),
         vol.Optional("dato"): cv.date,
         vol.Optional("note"): vol.All(cv.string, vol.Length(max=200)),
     }
@@ -87,17 +88,32 @@ def _coordinator(hass: HomeAssistant) -> CleverCoordinator:
     return entries[0].runtime_data
 
 
+async def async_add_charge(
+    coordinator: CleverCoordinator,
+    kwh: float,
+    pris: float | None,
+    stopped: date | None,
+    note: str | None,
+) -> PublicCharge:
+    """Shared by the service and the dashboard form's button."""
+    today = dt_util.now().astimezone(DK_TZ).date()
+    stopped = stopped or today
+    if stopped > today:
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="future")
+    return await coordinator.public.async_add(kwh, pris, stopped, note)
+
+
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Services for public charging (e.g. DC fast charging) that no sensor measures."""
 
     async def add(call: ServiceCall) -> ServiceResponse:
         coordinator = _coordinator(hass)
-        today = dt_util.now().astimezone(DK_TZ).date()
-        stopped = call.data.get("dato") or today
-        if stopped > today:
-            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="future")
-        charge = await coordinator.public.async_add(
-            call.data["kwh"], call.data["pris"], stopped, call.data.get("note")
+        charge = await async_add_charge(
+            coordinator,
+            call.data["kwh"],
+            call.data.get("pris"),
+            call.data.get("dato"),
+            call.data.get("note"),
         )
         return _charge_dict(charge)
 

@@ -31,12 +31,22 @@ class PublicCharge:
     id: str
     dato: str  # ISO date (Danish) the charge stopped
     kwh: float
-    pris: float  # kr. actually paid for the charge
+    pris: float | None  # kr. actually paid; None: charged on Clever (priced with the alternative)
     note: str | None = None
 
     @property
     def month(self) -> str:
         return date.fromisoformat(self.dato).strftime("%Y-%m")
+
+
+@dataclass
+class ChargeForm:
+    """Values typed into the dashboard form before "Tilføj DC-ladning" is pressed."""
+
+    dato: date | None = None  # None: today
+    kwh: float = 0.0
+    pris: float = 0.0
+    note: str = ""
 
 
 class PublicCharging:
@@ -47,7 +57,9 @@ class PublicCharging:
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}.offentlig_ladning"
         )
         self.charges: list[PublicCharge] = []
+        self.form = ChargeForm()
         self._listeners: list[Callable[[], None]] = []
+        self._form_listeners: list[Callable[[], None]] = []
 
     async def async_load(self) -> None:
         raw = await self._store.async_load() or {}
@@ -58,7 +70,7 @@ class PublicCharging:
                     id=str(item["id"]),
                     dato=str(item["dato"]),
                     kwh=float(item["kwh"]),
-                    pris=float(item["pris"]),
+                    pris=None if item.get("pris") is None else float(item["pris"]),
                     note=item.get("note"),
                 )
                 _ = charge.month  # validates the date
@@ -72,19 +84,29 @@ class PublicCharging:
         self._listeners.append(listener)
         return lambda: self._listeners.remove(listener)
 
+    @callback
+    def async_add_form_listener(self, listener: Callable[[], None]) -> CALLBACK_TYPE:
+        self._form_listeners.append(listener)
+        return lambda: self._form_listeners.remove(listener)
+
+    @callback
+    def async_form_changed(self) -> None:
+        for listener in list(self._form_listeners):
+            listener()
+
     async def _async_changed(self) -> None:
         await self._store.async_save({"ladninger": [asdict(c) for c in self.charges]})
         for listener in list(self._listeners):
             listener()
 
     async def async_add(
-        self, kwh: float, pris: float, stopped: date, note: str | None
+        self, kwh: float, pris: float | None, stopped: date, note: str | None
     ) -> PublicCharge:
         charge = PublicCharge(
             id=uuid.uuid4().hex[:8],
             dato=stopped.isoformat(),
             kwh=round(float(kwh), 3),
-            pris=round(float(pris), 2),
+            pris=None if pris is None else round(float(pris), 2),
             note=note or None,
         )
         oldest = month_of(dt_util.now())
@@ -115,4 +137,18 @@ class PublicCharging:
         return round(sum(c.kwh for c in self.for_month(month)), 3)
 
     def paid(self, month: str) -> float:
-        return round(sum(c.pris for c in self.for_month(month)), 2)
+        """What was actually paid (charges with a receipt price)."""
+        return round(sum(c.pris for c in self.for_month(month) if c.pris is not None), 2)
+
+    def unpriced_kwh(self, month: str) -> float:
+        return round(sum(c.kwh for c in self.for_month(month) if c.pris is None), 3)
+
+    def cost_without(self, month: str, alternative_price: float | None) -> float | None:
+        """Public charging without Clever: receipt prices, else kWh × the alternative price.
+
+        None when a charge has no price and no alternative price is set.
+        """
+        unpriced = self.unpriced_kwh(month)
+        if unpriced and alternative_price is None:
+            return None
+        return round(self.paid(month) + unpriced * (alternative_price or 0.0), 2)

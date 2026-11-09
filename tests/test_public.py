@@ -150,8 +150,8 @@ async def test_invalid_kwh(hass, dk_time, http, kwh):
         await add(hass, kwh=kwh, pris=10)
 
 
-@pytest.mark.parametrize("data", [{"kwh": 10}, {"kwh": 10, "pris": -1}, {"kwh": 10, "pris": "x"}])
-async def test_price_required_and_valid(hass, dk_time, http, data):
+@pytest.mark.parametrize("data", [{"kwh": 10, "pris": -1}, {"kwh": 10, "pris": "x"}])
+async def test_price_valid(hass, dk_time, http, data):
     await setup(hass, http, month_records("2026-11"))
     with pytest.raises(vol.Invalid):
         await add(hass, **data)
@@ -314,3 +314,39 @@ async def test_comparison_last_month(hass, dk_time, http):
     assert state(hass, WITH + "_sidste_maaned") == str(med)
     assert state(hass, WITHOUT + "_sidste_maaned") == str(uden)
     assert state(hass, DIFF + "_sidste_maaned") == str(round(uden - med, 2))
+
+
+async def test_clever_owner_charge_without_price_uses_alternative(hass, dk_time, http):
+    """Charged on Clever (no receipt): without Clever = kWh × the alternative price."""
+    energy(hass, "189.574")
+    await setup(
+        hass,
+        http,
+        month_records("2026-11"),
+        energy_entity=ENERGY,
+        home_price=1.2,
+        public_price=4.5,
+    )
+    resp = await add(hass, kwh=120)
+    assert resp["pris"] is None
+    await add(hass, kwh=10, pris=60)  # one with a receipt
+    await hass.async_block_till_done()
+    assert state(hass, PAID) == "60.0"
+    paid = hass.states.get(PAID).attributes
+    assert paid["energi_kwh_uden_pris"] == 120.0 and paid["pris_pr_kwh"] == 6.0
+    public_without = round(60 + 120 * 4.5, 2)
+    assert state(hass, SAVING) == str(round(public_without - 1.59 * 130, 2))
+    home = round(1.2 * 189.574, 2)
+    assert state(hass, WITHOUT) == str(round(home + public_without, 2))
+    a = hass.states.get(DIFF).attributes
+    assert a["offentlig_ladning_uden_clever"] == public_without
+    assert a["offentlig_ladning_betalt"] == 60.0 and a["alternativ_dc_pris_pr_kwh"] == 4.5
+
+
+async def test_charge_without_price_needs_alternative_price(hass, dk_time, http):
+    await setup(hass, http, month_records("2026-11"))
+    await add(hass, kwh=120)
+    await hass.async_block_till_done()
+    assert state(hass, PUB_SUR) == "190.8"  # with Clever still known
+    assert state(hass, WITHOUT) == "unavailable" and state(hass, SAVING) == "unavailable"
+    assert hass.states.get(PUB_SUR).attributes["uden_clever"] is None

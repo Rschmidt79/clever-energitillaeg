@@ -14,6 +14,7 @@ CONF_VAT = "vat_percent"
 CONF_SUBSCRIPTION = "subscription"
 CONF_HOME_COST_ENTITY = "home_cost_entity"  # kr. for home charging this month (utility meter)
 CONF_HOME_PRICE = "home_price"  # fixed kr./kWh, used when no cost sensor is chosen
+CONF_PUBLIC_PRICE = "public_price"  # kr./kWh for public charges without a receipt price
 
 DEFAULT_THRESHOLD = 0.89  # kr./kWh incl. VAT, Clever terms § 3.1.2
 DEFAULT_VAT = 25.0
@@ -54,6 +55,12 @@ OBJECT_IDS = {
     "comparison_without_last_month": "uden_clever_sidste_maaned",
     "comparison_difference": "forskel_med_clever",
     "comparison_difference_last_month": "forskel_med_clever_sidste_maaned",
+    "form_date": "dc_dato",
+    "form_kwh": "dc_kwh",
+    "form_price": "dc_pris",
+    "form_note": "dc_note",
+    "form_add": "tilfoej_dc_ladning",
+    "form_undo": "fortryd_seneste_dc_ladning",
     "total_surcharge": "foreloebigt_energitillaeg_i_alt",
     "total_last_month_surcharge": "energitillaeg_sidste_maaned_i_alt",
 }

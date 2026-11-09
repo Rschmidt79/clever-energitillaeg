@@ -10,6 +10,7 @@ from .coordinator import CleverCoordinator
 
 
 class CleverEntity(CoordinatorEntity[CleverCoordinator]):
+    _platform = "sensor"
     _attr_has_entity_name = True
     _attr_attribution = ATTRIBUTION
 
@@ -21,7 +22,7 @@ class CleverEntity(CoordinatorEntity[CleverCoordinator]):
             self._attr_translation_key = key
             object_id = OBJECT_IDS[key]
         # Danish entity ids regardless of the HA language (æ/ø spelled ae/oe).
-        self.entity_id = f"sensor.{DOMAIN}_{object_id}"
+        self.entity_id = f"{self._platform}.{DOMAIN}_{object_id}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name=NAME,

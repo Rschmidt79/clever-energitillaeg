@@ -19,6 +19,7 @@ from .calc import MonthResult, calculate, month_of, next_month, previous_month
 from .const import (
     CONF_HOME_COST_ENTITY,
     CONF_HOME_PRICE,
+    CONF_PUBLIC_PRICE,
     CONF_SUBSCRIPTION,
     CONF_THRESHOLD,
     CONF_VAT,
@@ -69,6 +70,8 @@ class CleverCoordinator(DataUpdateCoordinator[CleverData]):
         self.home_cost_entity: str | None = option(entry, CONF_HOME_COST_ENTITY, None) or None
         home_price = option(entry, CONF_HOME_PRICE, None)
         self.home_price: float | None = None if home_price is None else float(home_price)
+        public_price = option(entry, CONF_PUBLIC_PRICE, None)
+        self.public_price: float | None = None if public_price is None else float(public_price)
         self._store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}"
         )

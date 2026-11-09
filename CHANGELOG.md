@@ -1,5 +1,12 @@
 # Ændringer
 
+## 0.5.0 – 2026-11-09
+
+- Virker også den anden vej: har du Clever, kan du tilføje offentlig ladning uden pris. "Uden Clever" regner den med den nye indstilling *Alternativ pris for offentlig ladning* (kr./kWh). Ladninger med pris (kvittering) bruger stadig kvitteringens beløb.
+- Formular til DC-ladninger følger med integrationen: dato, kWh, pris, note og knapperne *Tilføj DC-ladning* og *Fortryd seneste DC-ladning*. Der skal ikke laves hjælpere eller scripts.
+- README: forsyningsmålere i brugerfladen, hjemmeladningens pris og kort-eksempel til med/uden Clever, DC og formularen.
+- `offentlig_ladning_betalt` tæller kun ladninger med pris. Nye attributter `energi_kwh_uden_pris` og `uden_clever`.
+
 ## 0.4.0 – 2026-11-09
 
 - Offentlig ladning (fx DC-lynladning hos Tesla): handlingen `clever_energitillaeg.tilfoej_offentlig_ladning` med dato, kWh, betalt pris og note, og `clever_energitillaeg.fjern_offentlig_ladning`. Ladningerne gemmes og overlever genstart.

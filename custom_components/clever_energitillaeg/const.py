@@ -11,9 +11,13 @@ CONF_ENERGY_ENTITIES = "energy_entities"
 CONF_ENERGY_ENTITY = "energy_entity"  # 0.1.0: one sensor; migrated to CONF_ENERGY_ENTITIES
 CONF_THRESHOLD = "threshold"
 CONF_VAT = "vat_percent"
+CONF_SUBSCRIPTION = "subscription"
+CONF_HOME_COST_ENTITY = "home_cost_entity"  # kr. for home charging this month (utility meter)
+CONF_HOME_PRICE = "home_price"  # fixed kr./kWh, used when no cost sensor is chosen
 
 DEFAULT_THRESHOLD = 0.89  # kr./kWh incl. VAT, Clever terms § 3.1.2
 DEFAULT_VAT = 25.0
+DEFAULT_SUBSCRIPTION = 849.0  # kr./md., Clever One med ladeboks (clever.dk, november 2026)
 
 API_URL = "https://api.energidataservice.dk/dataset/DayAheadPrices"
 PRICE_AREAS = ("DK1", "DK2")
@@ -36,6 +40,22 @@ OBJECT_IDS = {
     "average_dk2": "gennemsnit_dk2",
     "last_fetch": "seneste_hentning",
     "last_month_rate": "sats_sidste_maaned",
+    "public_energy": "offentlig_ladning",
+    "public_energy_last_month": "offentlig_ladning_sidste_maaned",
+    "public_surcharge": "foreloebigt_energitillaeg_offentlig_ladning",
+    "public_last_month_surcharge": "energitillaeg_sidste_maaned_offentlig_ladning",
+    "public_paid": "offentlig_ladning_betalt",
+    "public_paid_last_month": "offentlig_ladning_betalt_sidste_maaned",
+    "public_saving": "offentlig_ladning_besparelse_med_clever",
+    "public_saving_last_month": "offentlig_ladning_besparelse_med_clever_sidste_maaned",
+    "comparison_with": "med_clever",
+    "comparison_with_last_month": "med_clever_sidste_maaned",
+    "comparison_without": "uden_clever",
+    "comparison_without_last_month": "uden_clever_sidste_maaned",
+    "comparison_difference": "forskel_med_clever",
+    "comparison_difference_last_month": "forskel_med_clever_sidste_maaned",
+    "total_surcharge": "foreloebigt_energitillaeg_i_alt",
+    "total_last_month_surcharge": "energitillaeg_sidste_maaned_i_alt",
 }
 SURCHARGE_OBJECT_ID = "foreloebigt_energitillaeg"  # + "_" + the energy sensor's object id
 

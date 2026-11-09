@@ -170,7 +170,9 @@ async def test_rate_limit_retried_once(hass, dk_time, http):
     entry = make_entry()
     entry.add_to_hass(hass)
     task = hass.async_create_task(hass.config_entries.async_setup(entry.entry_id))
-    for _ in range(20):
+    for _ in range(200):  # until the first request (stored data is loaded first)
+        if calls:
+            break
         await asyncio.sleep(0)
     assert len(calls) == 1 and not task.done()
     moment = local(2026, 11, 6, 9, 1, 20)
@@ -284,6 +286,28 @@ async def test_danish_entity_ids_and_names(hass, dk_time, http):
         "last_month_surcharge_sensor.monthly_energy": (
             "sensor.clever_energitillaeg_energitillaeg_sidste_maaned_monthly_energy"
         ),
+        "public_energy": "sensor.clever_energitillaeg_offentlig_ladning",
+        "public_energy_last_month": "sensor.clever_energitillaeg_offentlig_ladning_sidste_maaned",
+        "public_surcharge": "sensor.clever_energitillaeg_foreloebigt_energitillaeg_offentlig_ladning",
+        "public_last_month_surcharge": (
+            "sensor.clever_energitillaeg_energitillaeg_sidste_maaned_offentlig_ladning"
+        ),
+        "public_paid": "sensor.clever_energitillaeg_offentlig_ladning_betalt",
+        "public_paid_last_month": "sensor.clever_energitillaeg_offentlig_ladning_betalt_sidste_maaned",
+        "public_saving": "sensor.clever_energitillaeg_offentlig_ladning_besparelse_med_clever",
+        "public_saving_last_month": (
+            "sensor.clever_energitillaeg_offentlig_ladning_besparelse_med_clever_sidste_maaned"
+        ),
+        "comparison_with": "sensor.clever_energitillaeg_med_clever",
+        "comparison_with_last_month": "sensor.clever_energitillaeg_med_clever_sidste_maaned",
+        "comparison_without": "sensor.clever_energitillaeg_uden_clever",
+        "comparison_without_last_month": "sensor.clever_energitillaeg_uden_clever_sidste_maaned",
+        "comparison_difference": "sensor.clever_energitillaeg_forskel_med_clever",
+        "comparison_difference_last_month": (
+            "sensor.clever_energitillaeg_forskel_med_clever_sidste_maaned"
+        ),
+        "total_surcharge": "sensor.clever_energitillaeg_foreloebigt_energitillaeg_i_alt",
+        "total_last_month_surcharge": "sensor.clever_energitillaeg_energitillaeg_sidste_maaned_i_alt",
     }
     rate = hass.states.get(e["rate"])
     assert rate.attributes["friendly_name"] == "Clever energitillæg Foreløbig sats"
@@ -330,7 +354,7 @@ async def test_migrates_0_1_0_entry_ids_and_single_sensor(hass, dk_time, http):
     assert e["average_dk2"] == "sensor.mit_eget_navn"
     # Same registry entry (renamed, not recreated): the recorder keeps its history.
     assert reg.async_get(e["surcharge"]).id == old_surcharge.id
-    assert len([x for x in reg.entities.values() if x.platform == "clever_energitillaeg"]) == 8
+    assert len([x for x in reg.entities.values() if x.platform == "clever_energitillaeg"]) == 24
     assert hass.states.get("sensor.clever_energitillaeg_foreloebig_sats").state == "1.59"
     assert hass.states.get(e["surcharge"]).state == "15.9"
     assert hass.states.get("sensor.clever_energitillaeg_preliminary_rate") is None

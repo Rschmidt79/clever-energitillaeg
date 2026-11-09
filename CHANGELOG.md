@@ -1,5 +1,12 @@
 # Ændringer
 
+## 0.4.0 – 2026-11-09
+
+- Offentlig ladning (fx DC-lynladning hos Tesla): handlingen `clever_energitillaeg.tilfoej_offentlig_ladning` med dato, kWh, betalt pris og note, og `clever_energitillaeg.fjern_offentlig_ladning`. Ladningerne gemmes og overlever genstart.
+- Nye sensorer for denne og sidste måned: `offentlig_ladning` (kWh, med listen `ladninger`), `offentlig_ladning_betalt` (kr.), `foreloebigt_energitillaeg_offentlig_ladning` / `energitillaeg_sidste_maaned_offentlig_ladning` (med Clever: sats × kWh) og `offentlig_ladning_besparelse_med_clever` (betalt − med Clever).
+- Sammenligning med og uden Clever (Clever One + Clever Power): `med_clever`, `uden_clever`, `forskel_med_clever` (+ `_sidste_maaned`). Nye indstillinger: Clever-abonnement (standard 849 kr./md.) og hjemmeladningens pris (sensor i kr. pr. måned eller fast kr./kWh).
+- Nye sensorer `foreloebigt_energitillaeg_i_alt` og `energitillaeg_sidste_maaned_i_alt`: sats × (alle valgte energisensorer + offentlig ladning).
+
 ## 0.3.0 – 2026-11-07
 
 - Dag for dag: attributten `dage` (dagsgennemsnit, måned-til-dato og sats efter hver dag) til grafer som Clevers.

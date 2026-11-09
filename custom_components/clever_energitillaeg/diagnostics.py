@@ -24,4 +24,8 @@ async def async_get_config_entry_diagnostics(
         "last_attempt": data.last_attempt.isoformat() if data else None,
         "result": data.result.as_dict() if data and data.result else None,
         "last_update_success": coordinator.last_update_success,
+        "public_charging_kwh": {
+            month: coordinator.public.kwh(month)
+            for month in sorted({c.month for c in coordinator.public.charges})
+        },
     }
